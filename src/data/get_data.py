@@ -41,18 +41,23 @@ class PriceData:
 
         end_date = end_date.strftime("%Y-%m-%d %H:%M:%S.%f")
         end_date = dt.strptime(end_date, "%Y-%m-%d %H:%M:%S.%f")
+
+        logger.info(f"fetching {self.symbol} M{timeframe} price data from {start_date} to {end_date}")
         try:
-            print(type(start_date), type(end_date))
             price_data = mt5.copy_rates_range(
                 self.symbol,
                 timeframe,
                 start_date,
                 end_date,
             )
+            mt5.shutdown()
+            logger.info(f"price fetch success")
         except Exception as e:
+            mt5.shutdown()
+            logger.error(f"error fetching price data: {e}")
             print("error fetching price data:\n", e)
 
-        if price_data:
+        if isinstance(price_data, np.ndarray):
             return price_data
         else:
             print("error retrieving data from MT5 server")
@@ -75,23 +80,28 @@ class PriceData:
                 start_bar,
                 num_bars
             )
+            mt5.shutdown()
         except Exception as e:
+            mt5.shutdown()
             print(f"error fetching {num_bars} rows of price data\n", e)
 
-        if bars:
+        if isinstance(bars, np.ndarray):
             return bars
         else:
             print("error fetching price data from MT5 server")
-    
-    def save(self, price_data: np.ndarray, path: str):
-        price_df = pd.DataFrame(price_data)
-        price_df['time']=pd.to_datetime(price_df['time'], unit='s')
-        price_df.to_csv(path, index=False)
+
+    def save(self, price_array: np.ndarray, path: str):
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            price_df = pd.DataFrame(price_array)
+            price_df['time']=pd.to_datetime(price_df['time'], unit='s')
+            price_df.to_csv(path, index=False)
+            logger.info(f"price data saved to {path}")
+        except Exception as e:
+            print(f"error saving price data to {path}", e)
+            logger.error(f"error saving price data to {path}:\n {e}")
 
 if __name__ == "__main__":
     price_data = PriceData("EURUSD")
     fetched_data = price_data.fetch(dt(2024, 1, 1), dt(2024, 11, 14), mt5.TIMEFRAME_M15)
-    price_data.save(price_data=price_data, path="./data/raw/price_data.csv")
-
-
-
+    price_data.save(price_array=fetched_data, path="./data/raw/price_data.csv")
