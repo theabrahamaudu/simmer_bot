@@ -18,12 +18,19 @@ class PriceData:
         self.__setup()
 
     def __setup(self):
-        mt5.initialize()
-        mt5.login(
-            self.__login,
-            self.__password,
-            self.__server
-        )
+        try:
+            logger.info(
+                f"initializing and logging into account -> {self.__login} on server -> {self.__server}"
+            )
+            mt5.initialize()
+            mt5.login(
+                self.__login,
+                self.__password,
+                self.__server
+            )
+            logger.info("login successful")
+        except Exception as e:
+            logger.error(f"Error initializing and logging into account -> {self.__login}: {e}")
 
     def fetch(self, start_date: dt, end_date: dt, timeframe: int) -> np.ndarray:
         """Fetch all price data from start to end date range
@@ -42,8 +49,8 @@ class PriceData:
         end_date = end_date.strftime("%Y-%m-%d %H:%M:%S.%f")
         end_date = dt.strptime(end_date, "%Y-%m-%d %H:%M:%S.%f")
 
-        logger.info(f"fetching {self.symbol} M{timeframe} price data from {start_date} to {end_date}")
         try:
+            logger.info(f"fetching {self.symbol} M{timeframe} price data from {start_date} to {end_date}")
             price_data = mt5.copy_rates_range(
                 self.symbol,
                 timeframe,
@@ -103,5 +110,5 @@ class PriceData:
 
 if __name__ == "__main__":
     price_data = PriceData("EURUSD")
-    fetched_data = price_data.fetch(dt(2024, 1, 1), dt(2024, 11, 14), mt5.TIMEFRAME_M15)
+    fetched_data = price_data.fetch(dt(2014, 1, 1), dt(2024, 11, 18), mt5.TIMEFRAME_M15)
     price_data.save(price_array=fetched_data, path="./data/raw/price_data.csv")
