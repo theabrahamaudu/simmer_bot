@@ -1,5 +1,5 @@
 """
-MOdule to download price and news data
+Module to download price and news data
 """
 
 import os
