@@ -1,3 +1,6 @@
+import os
+from random import uniform
+from ast import literal_eval
 from datetime import datetime, timedelta
 from time import sleep
 import requests
@@ -6,7 +9,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
 import pandas as pd
 from bs4 import BeautifulSoup as bs
 from src.utils.data_log_config import logger
@@ -28,7 +30,7 @@ class NewsData:
         for date_range in date_ranges:
             options = webdriver.FirefoxOptions()
             options.page_load_strategy = 'none'
-            # options.add_argument("--headless")
+            options.add_argument("--headless")
             self.wd = webdriver.Firefox(options=options)
             self.wd.maximize_window()
             news_list = []
@@ -55,6 +57,55 @@ class NewsData:
                 print(f"error fetching news data for {date_range}", e)
                 logger.error("error fetching news data for %s:\n %s", date_range, e)
                 self.wd.quit()
+
+    def get_news_article_texts(
+            self,
+            source_path: str = "./data/raw",
+            save_path: str = "./data/interim"
+        ) -> None:
+
+        options = webdriver.FirefoxOptions()
+        options.page_load_strategy = 'none'
+        # options.add_argument("--headless")
+        self.wd = webdriver.Firefox(options=options)
+        self.wd.maximize_window()
+
+        logger.info("loading news data from %s", source_path)
+        csv_files = self.__scanDir(
+            directory=source_path,
+            extension=".csv",
+            check_dir=save_path,
+            pickup=True
+        )
+        logger.info("found %s unparsed csv files in %s", len(csv_files), source_path)
+        success_count = 0
+        for csv_file in csv_files[:1]:
+            news_df = pd.read_csv(f"{source_path}/{csv_file}")
+
+            logger.info("getting news article texts for %s", csv_file)
+            try:
+                text_count = 0
+                for index, row in news_df.iterrows():
+                    for link in literal_eval(row["links"]):
+                        link_text = self.__get_link_text(link)
+                        news_df.loc[index, "link_text"] = link_text
+                        text_count += 1
+                        sleep(uniform(1, 3))
+
+                news_df.to_csv(f"{save_path}/{csv_file}", index=False)
+                logger.info(
+                    "%s updated with %s link texts and saved to %s/%s",
+                    csv_file,
+                    text_count,
+                    save_path,
+                    csv_file
+                )
+                success_count += 1
+            except Exception as e:
+                print(f"error getting news article texts for {csv_file}", e)
+                logger.error("error getting news article texts for %s:\n %s", csv_file, e)
+        logger.info("fetched news article texts for %s date ranges", success_count)
+        self.wd.quit()
 
 
     def __get_page(self, url: str) -> WebElement:
@@ -160,7 +211,6 @@ class NewsData:
             WebDriverWait(self.wd, 10).until(
                 EC.presence_of_all_elements_located((By.CLASS_NAME, "flexposts__storydisplay-info"))
             )
-            # self.wd.execute_script("window.stop();")
 
             # get latest related stories
             last_related_stories = self.wd.find_elements(
@@ -188,6 +238,56 @@ class NewsData:
         except Exception as e:
             print("error getting row links", e)
             return []
+        
+    def __get_link_text(self, link: str) -> str:
+        # Open a new tab
+        self.wd.execute_script("window.open('');")
+
+        # Switch to the new tab
+        self.wd.switch_to.window(self.wd.window_handles[-1])
+
+        # Navigate to the link
+        self.wd.get(link[:-4])
+        WebDriverWait(self.wd, 30).until(
+            EC.presence_of_all_elements_located((By.CLASS_NAME, "news__copy"))
+        )
+        self.wd.execute_script("window.stop();")
+
+        # Extract the content
+        link_text = self.wd.find_element(By.CLASS_NAME, 'news__copy').text
+
+        # Close the tab
+        self.wd.close()
+
+        # Switch back to the original tab
+        self.wd.switch_to.window(self.wd.window_handles[0])
+
+        return link_text
+
+    @staticmethod
+    def __scanDir(directory: str, extension: str, check_dir: str = None, pickup: bool = False) -> list[str]:
+        """Check specified directory and return list of files with
+        specified extension
+
+        Args:
+            extension (str): extension type to be searched for e.g. ".txt"
+
+        Returns:
+            list: strings of file names with specified extension
+        """    
+        files: list = []
+        if pickup:
+            check_list = os.listdir(check_dir)
+            for filename in os.listdir(directory):
+                if filename.endswith(extension) and "news" in filename and filename not in check_list:
+                    files.append(filename)
+
+        else:
+            for filename in os.listdir(directory):
+                if filename.endswith(extension) and "news" in filename:
+                    files.append(filename)
+        files.sort()
+        return files
     
     @staticmethod
     def __generate_date_ranges(start_year: int, end_year: int) -> list[str]:
@@ -218,16 +318,25 @@ class NewsData:
                 current_date += timedelta(days=7)
 
         return date_ranges
-    
+
+
+
+    def combine_news_csv_files(self):
+        # TODO: implement this method
+        pass
+
+
 if __name__ == "__main__":
     news_data = NewsData(
         symbols=["EUR", "USD"],
         save_path="./data/raw"
         )
-    
-    # ! picking up from date range 188 based on log file
-    news_data.scrape_news(
-        start_year=2014,
-        end_year=2024,
-        pickup_idx=188
-    )
+
+    # ! picking up from date range index 188 based on log file end date
+    # ! change this if you want to start from a different date
+    # news_data.scrape_news(
+    #     start_year=2014,
+    #     end_year=2024,
+    #     pickup_idx=574
+    # )
+    news_data.get_news_article_texts()
