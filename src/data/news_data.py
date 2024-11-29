@@ -11,6 +11,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import pandas as pd
 from bs4 import BeautifulSoup as bs
+import undetected_chromedriver as uc
 from src.utils.data_log_config import logger
 
 
@@ -64,11 +65,7 @@ class NewsData:
             save_path: str = "./data/interim"
         ) -> None:
 
-        options = webdriver.FirefoxOptions()
-        options.page_load_strategy = 'none'
-        # options.add_argument("--headless")
-        self.wd = webdriver.Firefox(options=options)
-        self.wd.maximize_window()
+        self.__configure_webdriver()
 
         logger.info("loading news data from %s", source_path)
         csv_files = self.__scanDir(
@@ -79,24 +76,32 @@ class NewsData:
         )
         logger.info("found %s unparsed csv files in %s", len(csv_files), source_path)
         success_count = 0
-        for csv_file in csv_files[:1]:
+        for csv_file in csv_files:
             news_df = pd.read_csv(f"{source_path}/{csv_file}")
 
             logger.info("getting news article texts for %s", csv_file)
             try:
                 text_count = 0
+                row_count = 0
                 for index, row in news_df.iterrows():
+                    row_texts = str()
                     for link in literal_eval(row["links"]):
-                        link_text = self.__get_link_text(link)
-                        news_df.loc[index, "link_text"] = link_text
+                        if len(row_texts) == 0:
+                            row_texts += self.__get_link_text(link)
+                        else:
+                            row_texts += "\n " + self.__get_link_text(link)
                         text_count += 1
-                        sleep(uniform(1, 3))
+                    news_df.loc[index, "link_text"] = row_texts
+                    row_count += 1
+                        
+                        # sleep(uniform(1, 3))
 
                 news_df.to_csv(f"{save_path}/{csv_file}", index=False)
                 logger.info(
-                    "%s updated with %s link texts and saved to %s/%s",
+                    "%s updated with %s link texts in %s rows and saved to %s/%s",
                     csv_file,
                     text_count,
+                    row_count,
                     save_path,
                     csv_file
                 )
@@ -106,6 +111,20 @@ class NewsData:
                 logger.error("error getting news article texts for %s:\n %s", csv_file, e)
         logger.info("fetched news article texts for %s date ranges", success_count)
         self.wd.quit()
+
+
+    def __configure_webdriver(self) -> None:
+            try:
+                options = webdriver.FirefoxOptions()
+                options.page_load_strategy = 'none'
+                options.add_argument("--headless")
+                self.wd = webdriver.Firefox(options=options)
+                self.wd.maximize_window()
+                logger.info("webdriver configured")
+            except Exception as e:
+                print("error configuring webdriver", e)
+                logger.error("error configuring webdriver:\n %s", e)
+            
 
 
     def __get_page(self, url: str) -> WebElement:
@@ -240,29 +259,57 @@ class NewsData:
             return []
         
     def __get_link_text(self, link: str) -> str:
-        # Open a new tab
-        self.wd.execute_script("window.open('');")
+        try:
+            # Open a new tab
+            self.wd.execute_script("window.open('');")
 
-        # Switch to the new tab
-        self.wd.switch_to.window(self.wd.window_handles[-1])
+            # Switch to the new tab
+            self.wd.switch_to.window(self.wd.window_handles[-1])
 
-        # Navigate to the link
-        self.wd.get(link[:-4])
-        WebDriverWait(self.wd, 30).until(
-            EC.presence_of_all_elements_located((By.CLASS_NAME, "news__copy"))
-        )
-        self.wd.execute_script("window.stop();")
+            # Navigate to the link
+            self.wd.get(link[:-4])
+            WebDriverWait(self.wd, uniform(20,30)).until(
+                EC.presence_of_all_elements_located((By.CLASS_NAME, "news__caption"))
+            )
+            self.wd.execute_script("window.stop();")
 
-        # Extract the content
-        link_text = self.wd.find_element(By.CLASS_NAME, 'news__copy').text
+            # check source
+            source = self.wd.find_element(
+                By.CLASS_NAME,
+                "news__caption"
+            ).text
 
-        # Close the tab
-        self.wd.close()
+            if "youtube" not in source.lower():
+                # Extract the content
+                link_text = self.wd.find_element(By.CLASS_NAME, 'news__copy').text
 
-        # Switch back to the original tab
-        self.wd.switch_to.window(self.wd.window_handles[0])
+                # Close the tab
+                self.wd.close()
 
-        return link_text
+                # Switch back to the original tab
+                self.wd.switch_to.window(self.wd.window_handles[0])
+
+                return link_text
+            else:
+                # Close the tab
+                self.wd.close()
+                
+                # Switch back to the original tab
+                self.wd.switch_to.window(self.wd.window_handles[0])
+                print("youtube link, skipping...")
+                return ""
+
+        except Exception as e:
+            # Close the tab
+            self.wd.close()
+
+            # Switch back to the original tab
+            self.wd.switch_to.window(self.wd.window_handles[0])
+            print("error getting link text", e)
+            self.wd.quit()
+            self.__configure_webdriver()
+            return ""
+
 
     @staticmethod
     def __scanDir(directory: str, extension: str, check_dir: str = None, pickup: bool = False) -> list[str]:
