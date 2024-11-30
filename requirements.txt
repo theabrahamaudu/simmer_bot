@@ -17,4 +17,3 @@ numpy==1.26.4
 selenium
 beautifulsoup4
 pyyaml
-undetected-chromedriver

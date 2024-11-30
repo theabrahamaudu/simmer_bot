@@ -2,16 +2,12 @@ import os
 from random import uniform
 from ast import literal_eval
 from datetime import datetime, timedelta
-from time import sleep
-import requests
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import pandas as pd
-from bs4 import BeautifulSoup as bs
-import undetected_chromedriver as uc
 from src.utils.data_log_config import logger
 
 
@@ -77,54 +73,61 @@ class NewsData:
         logger.info("found %s unparsed csv files in %s", len(csv_files), source_path)
         success_count = 0
         for csv_file in csv_files:
-            news_df = pd.read_csv(f"{source_path}/{csv_file}")
-
-            logger.info("getting news article texts for %s", csv_file)
             try:
-                text_count = 0
-                row_count = 0
-                for index, row in news_df.iterrows():
-                    row_texts = str()
-                    for link in literal_eval(row["links"]):
-                        if len(row_texts) == 0:
-                            row_texts += self.__get_link_text(link)
-                        else:
-                            row_texts += "\n " + self.__get_link_text(link)
-                        text_count += 1
-                    news_df.loc[index, "link_text"] = row_texts
-                    row_count += 1
-                        
-                        # sleep(uniform(1, 3))
+                news_df = pd.read_csv(f"{source_path}/{csv_file}")
 
-                news_df.to_csv(f"{save_path}/{csv_file}", index=False)
-                logger.info(
-                    "%s updated with %s link texts in %s rows and saved to %s/%s",
-                    csv_file,
-                    text_count,
-                    row_count,
-                    save_path,
-                    csv_file
-                )
-                success_count += 1
+                logger.info("getting news article texts for %s", csv_file)
+                load_status = True
             except Exception as e:
-                print(f"error getting news article texts for {csv_file}", e)
-                logger.error("error getting news article texts for %s:\n %s", csv_file, e)
+                load_status = False
+                print(f"error loading news data for {csv_file}", e)
+                logger.error("error loading news data for %s:\n %s", csv_file, e)
+
+            if load_status:
+                try:
+                    text_count = 0
+                    row_count = 0
+                    for index, row in news_df.iterrows():
+                        row_texts = str()
+                        for link in literal_eval(row["links"]):
+                            if len(row_texts) == 0:
+                                row_texts += self.__get_link_text(link)
+                            else:
+                                row_texts += "\n " + self.__get_link_text(link)
+                            text_count += 1
+                        news_df.loc[index, "link_text"] = row_texts
+                        row_count += 1
+                            
+                            # sleep(uniform(1, 3))
+
+                    news_df.to_csv(f"{save_path}/{csv_file}", index=False)
+                    logger.info(
+                        "%s updated with %s link texts in %s rows and saved to %s/%s",
+                        csv_file,
+                        text_count,
+                        row_count,
+                        save_path,
+                        csv_file
+                    )
+                    success_count += 1
+                except Exception as e:
+                    print(f"error getting news article texts for {csv_file}", e)
+                    logger.error("error getting news article texts for %s:\n %s", csv_file, e)
         logger.info("fetched news article texts for %s date ranges", success_count)
         self.wd.quit()
 
 
     def __configure_webdriver(self) -> None:
-            try:
-                options = webdriver.FirefoxOptions()
-                options.page_load_strategy = 'none'
-                options.add_argument("--headless")
-                self.wd = webdriver.Firefox(options=options)
-                self.wd.maximize_window()
-                logger.info("webdriver configured")
-            except Exception as e:
-                print("error configuring webdriver", e)
-                logger.error("error configuring webdriver:\n %s", e)
-            
+        try:
+            options = webdriver.FirefoxOptions()
+            options.page_load_strategy = 'none'
+            options.add_argument("--headless")
+            self.wd = webdriver.Firefox(options=options)
+            self.wd.maximize_window()
+            logger.info("webdriver configured")
+        except Exception as e:
+            print("error configuring webdriver", e)
+            logger.error("error configuring webdriver:\n %s", e)
 
 
     def __get_page(self, url: str) -> WebElement:
