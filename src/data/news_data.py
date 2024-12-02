@@ -369,11 +369,57 @@ class NewsData:
 
         return date_ranges
 
+    @staticmethod
+    def __clean_date_time(df: pd.DataFrame) -> pd.DataFrame:
+        # Handle leading rows with incorrect timestamps
+        first_valid_index = df[df["timestamp"].str.contains("am|pm", na=False)].index.min()
+        if first_valid_index is not None:
+            first_valid_timestamp = df.loc[first_valid_index, "timestamp"]
+            for index in range(first_valid_index):
+                df.loc[index, "timestamp"] = first_valid_timestamp
+
+        # Iterate through the rest of the rows to fix missing timestamps
+        for index, row in df.iterrows():
+            if 'am' not in str(row["timestamp"]) and 'pm' not in str(row["timestamp"]):
+                if index > 0:
+                    # Replace missing timestamp with the previous row's timestamp
+                    df.loc[index, "timestamp"] = df["timestamp"].iloc[index - 1]
+
+            # Combine 'date' and 'timestamp' columns into a single string
+            date_string = row["date"].replace('\n', ' ') + " " + str(df.loc[index, "timestamp"])
+            df.loc[index, "datetime"] = datetime.strptime(date_string, '%a %b %d %Y %I:%M%p')
+
+        return df
 
 
-    def combine_news_csv_files(self):
-        # TODO: implement this method
-        pass
+    def combine_news_csv_files(
+            self,
+            source_path: str = "./data/interim",
+            save_path: str = "./data/interim") -> None:
+        
+        files = self.__scanDir(source_path, ".csv")
+        logger.info("found %s csv files", len(files))
+
+        dataframes = []
+        skipped_files = []
+        for file in files:
+            try:
+                raw_df = pd.read_csv(f"{source_path}/{file}")
+                if len(raw_df) != 0:
+                    dataframes.append(self.__clean_date_time(raw_df))
+                else:
+                    skipped_files.append(file)
+                    logger.warning("skipping empty csv file %s", file)
+            except Exception as e:
+                logger.warning("error loading csv file %s:\n %s", file, e)
+                skipped_files.append(file)
+                continue
+        logger.info("combined %s csv files", len(dataframes))
+        logger.warning("skipped %s csv files", len(skipped_files))
+
+        combined_df = pd.concat(dataframes, ignore_index=True)
+        combined_df.to_csv(f"{save_path}/combined_scrapped_data.csv", index=False)
+        logger.info("combined news data saved to %s/combined_scraped_data.csv", save_path)
 
 
 if __name__ == "__main__":
@@ -384,9 +430,15 @@ if __name__ == "__main__":
 
     # ! picking up from date range index 188 based on log file end date
     # ! change this if you want to start from a different date
+    # Fetch Price Data
     # news_data.scrape_news(
     #     start_year=2014,
     #     end_year=2024,
     #     pickup_idx=574
     # )
-    news_data.get_news_article_texts()
+
+    # Scrape News Data
+    # news_data.get_news_article_texts()
+    
+    # Combine News Data
+    news_data.combine_news_csv_files()
