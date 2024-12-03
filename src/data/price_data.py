@@ -7,7 +7,7 @@ from datetime import datetime as dt
 import MetaTrader5 as mt5
 import pandas as pd
 import numpy as np
-from src.utils.data_log_config import logger
+from src.utils.data_fetch_log_config import logger
 
 class PriceData:
     def __init__(self, symbol: str):

@@ -8,7 +8,7 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import pandas as pd
-from src.utils.data_log_config import logger
+from src.utils.data_fetch_log_config import logger
 
 
 class NewsData:
