@@ -14,6 +14,7 @@ MetaTrader5
 # TA-Lib
 pandas
 numpy==1.26.4
+langchain-community
 selenium
 beautifulsoup4
 pyyaml

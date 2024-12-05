@@ -1,6 +1,4 @@
-import os
 import pandas as pd
-from datetime import datetime
 from src.utils.data_preprocess_log_config import logger
 
 
@@ -12,7 +10,10 @@ class CleanData:
 
     def clean(self, output_file_name: str = "cleaned_scraped_data") -> None:
         df = self.__load_data()
-        df = self.__select_important_cols(df)
+        df = self.__select_important_cols(
+            df,
+            imp_cols= ["datetime", "impact", "link_text"]
+        )
         df = self.__sort_by_datetime(df)
         df = self.__drop_zero_value_news(df)
         df = self.__fill_empty_news_text(df)
@@ -24,7 +25,7 @@ class CleanData:
     @staticmethod
     def __select_important_cols(
             df: pd.DataFrame,
-            imp_cols: list = ["datetime", "impact", "link_text"]
+            imp_cols: list,
         ) -> pd.DataFrame:
         return df[imp_cols]
     
