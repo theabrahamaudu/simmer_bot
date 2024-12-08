@@ -12,6 +12,7 @@ ipykernel
 # core packages
 MetaTrader5
 # TA-Lib
+tqdm
 pandas
 numpy==1.26.4
 langchain-community
