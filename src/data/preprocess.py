@@ -159,6 +159,17 @@ class LLMSentimentAnalysis:
     @staticmethod
     def __clean_text(text: str) -> str:
         return re.sub(r'[^\x20-\x7E]+', ' ', text)[:7000]
+
+
+class TAIndicators:
+    def __init__(
+            self,
+            source_file_path: str = "./data/interim/merged_scrapped_n_price.csv",
+            save_path: str = "./data/interim"
+        ) -> None:
+        self.__source_file_path = source_file_path
+        self.__save_path = save_path
+
     
 if __name__ == "__main__":
     llm_sentiment_analyzer = LLMSentimentAnalysis()
