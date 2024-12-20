@@ -2,6 +2,7 @@ import os
 import time
 import re
 from tqdm import tqdm
+import joblib
 import pandas as pd
 import numpy as np
 import talib as ta
@@ -9,6 +10,7 @@ from langchain_core.runnables import RunnableSerializable
 from langchain_community.llms import ollama
 from langchain_core.output_parsers import StrOutputParser
 from langchain.prompts import PromptTemplate
+from sklearn.preprocessing import MinMaxScaler
 from src.utils.data_preprocess_log_config import logger
 
 class LLMSentimentAnalysis:
@@ -177,6 +179,7 @@ class TAIndicators:
     def add_indicators(self) -> pd.DataFrame:
         data = self.__load_data()
 
+        #### Momentum Indicators ####
         # ADX - Average Directional Movement Index
         data['adx_14'] = ta.ADX(
             data['high'], data['low'], data['close'], timeperiod=14
@@ -395,6 +398,257 @@ class TAIndicators:
         data['willr_21'] = ta.WILLR(
             data['high'], data['low'], data['close'], timeperiod=21
         )
+
+        #### Overlap Studies ####
+        # BBANDS - Bollinger Bands
+        data['upperband_5'], data['middleband_5'], data['lowerband_5'] = ta.BBANDS(
+            data['close'],
+            timeperiod=5,
+            nbdevup=2,
+            nbdevdn=2,
+            matype=0
+        )
+
+        data['upperband_10'], data['middleband_10'], data['lowerband_10'] = ta.BBANDS(
+            data['close'],
+            timeperiod=10,
+            nbdevup=2,
+            nbdevdn=2,
+            matype=0
+        )
+
+        data['upperband_50'], data['middleband_50'], data['lowerband_50'] = ta.BBANDS(
+            data['close'],
+            timeperiod=50,
+            nbdevup=2,
+            nbdevdn=2,
+            matype=0
+        )
+
+        # DEMA - Double Exponential Moving Average
+        data['dema_30'] = ta.DEMA(data['close'], timeperiod=30)
+        data['dema_10'] = ta.DEMA(data['close'], timeperiod=10)
+        data['dema_20'] = ta.DEMA(data['close'], timeperiod=20)
+
+        # EMA - Exponential Moving Average
+        data['ema_30'] = ta.EMA(data["close"], timeperiod=30)
+        data['ema_20'] = ta.EMA(data["close"], timeperiod=20)
+        data['ema_50'] = ta.EMA(data["close"], timeperiod=50)
+
+        # HT_TRENDLINE - Hilbert Transform - Instantaneous Trendline
+        data['ht_trendline'] = ta.HT_TRENDLINE(data["close"])
+
+        # KAMA - Kaufman Adaptive Moving Average
+        data['kama_30'] = ta.KAMA(data["close"], timeperiod=30)
+        data['kama_10'] = ta.KAMA(data["close"], timeperiod=10)
+        data['kama_15'] = ta.KAMA(data["close"], timeperiod=15)
+
+        # MA - Moving average
+        data['ma_30'] = ta.MA(data["close"], timeperiod=30, matype=0)
+        data['ma_5'] = ta.MA(data["close"], timeperiod=5, matype=0)
+        data['ma_10'] = ta.MA(data["close"], timeperiod=10, matype=0)
+        data['ma_20'] = ta.MA(data["close"], timeperiod=20, matype=0)
+        data['ma_50'] = ta.MA(data["close"], timeperiod=50, matype=0)
+        data['ma_200'] = ta.MA(data["close"], timeperiod=200, matype=0)
+
+        # MAMA - MESA Adaptive Moving Average
+        data['mama'], data['fama'] = ta.MAMA(
+            data["close"], fastlimit=0.5, slowlimit=0.05
+        )
+
+        # MAVP - Moving average with variable period
+        periods_mavp = 15 + 5 * np.sin(
+            np.linspace(0, 2 * np.pi, len(data['close']))
+        )
+        data['mavp'] = ta.MAVP(
+            data['close'],
+            periods=periods_mavp,
+            minperiod=2,
+            maxperiod=30,
+            matype=0
+        )
+
+        # MIDPOINT - MidPoint over period
+        data['midpoint_14'] = ta.MIDPOINT(data['close'], timeperiod=14)
+
+        # MIDPRICE - Midpoint Price over period
+        data['midprice_14'] = ta.MIDPRICE(
+            data['high'], data['low'], timeperiod=14
+        )
+
+        # SAR - Parabolic SAR
+        data['sar'] = ta.SAR(
+            data['high'], data['low'], acceleration=0.02, maximum=0.2
+        )
+
+        # SAREXT - Parabolic SAR - Extended
+        data['sarext'] = ta.SAREXT(
+            data['high'],
+            data['low'],
+            startvalue=0,
+            offsetonreverse=0,
+            accelerationinitlong=0.02,
+            accelerationlong=0.02,
+            accelerationmaxlong=0.2,
+            accelerationinitshort=0.02,
+            accelerationshort=0.02,
+            accelerationmaxshort=0.2
+        )
+
+        # T3 - Triple Exponential Moving Average (T3)
+        data['t3_5'] = ta.T3(data['close'], timeperiod=5, vfactor=0.7)
+        data['t3_9'] = ta.T3(data['close'], timeperiod=9, vfactor=0.7)
+        data['t3_14'] = ta.T3(data['close'], timeperiod=14, vfactor=0.7)
+
+        # TEMA - Triple Exponential Moving Average
+        data['tema_30'] = ta.TEMA(data['close'], timeperiod=30)
+        data['tema_9'] = ta.TEMA(data['close'], timeperiod=9)
+        data['tema_14'] = ta.TEMA(data['close'], timeperiod=14)
+        data['tema_21'] = ta.TEMA(data['close'], timeperiod=21)
+
+        # TRIMA - Triangular Moving Average
+        data['trima_30'] = ta.TRIMA(data['close'], timeperiod=30)
+        data['trima_9'] = ta.TRIMA(data['close'], timeperiod=9)
+        data['trima_14'] = ta.TRIMA(data['close'], timeperiod=14)
+        data['trima_21'] = ta.TRIMA(data['close'], timeperiod=21)
+
+        # WMA - Weighted Moving Average
+        data['wma_30'] = ta.WMA(data['close'], timeperiod=30)
+        data['wma_9'] = ta.WMA(data['close'], timeperiod=9)
+        data['wma_14'] = ta.WMA(data['close'], timeperiod=14)
+        data['wma_50'] = ta.WMA(data['close'], timeperiod=50)
+
+        #### Volatility ####
+        # ATR - Average True Range
+        data['atr_14'] = ta.ATR(
+            data['high'], data['low'], data['close'], timeperiod=14
+        )
+
+        data['atr_7'] = ta.ATR(
+            data['high'], data['low'], data['close'], timeperiod=7
+        )
+
+        data['atr_21'] = ta.ATR(
+            data['high'], data['low'], data['close'], timeperiod=21
+        )
+
+        # NATR - Normalized Average True Range
+        data['natr_14'] = ta.NATR(
+            data['high'], data['low'], data['close'], timeperiod=14
+        )
+
+        data['natr_7'] = ta.NATR(
+            data['high'], data['low'], data['close'], timeperiod=7
+        )
+
+        data['natr_21'] = ta.NATR(
+            data['high'], data['low'], data['close'], timeperiod=21
+        )
+
+        # TRANGE - True Range
+        data['trange'] = ta.TRANGE(data['high'], data['low'], data['close'])
+
+        #### Price Transform ####
+        # AVGPRICE - Average Price
+        data['avg_price'] = ta.AVGPRICE(
+            data['open'], data['high'], data['low'], data['close']
+        )
+
+        # MEDPRICE - Median Price
+        data['med_price'] = ta.MEDPRICE(data['high'], data['low'])
+
+        # TYPPRICE - Typical Price
+        data['typ_price'] = ta.TYPPRICE(
+            data['high'], data['low'], data['close']
+        )
+
+        # WCLPRICE - Weighted Close Price
+        data['wcl_price'] = ta.WCLPRICE(
+            data['high'], data['low'], data['close']
+        )
+
+        # drop Nan values
+        data_no_na = data.dropna(axis=0)
+        data_no_na.reset_index(inplace=True, drop=True)
+
+        return data_no_na
+
+
+class NumericalPreprocess:
+    def __init__(
+        self,
+        data: pd.DataFrame,
+        scaler_path:str='./artefacts/scaler.pkl',
+        train: bool=True,
+    ) -> None:
+        self.data = data
+        self.scaled_data = None
+        self.__scaler_path = scaler_path
+        self.__train = train
+        self.__impact_mapping = {
+            "Non-Economic": 0,
+            "Low Impact Expected": 1,
+            "Medium Impact Expected": 2,
+            "High Impact Expected": 3,
+        }
+
+    def run(self) -> pd.DataFrame:
+        data_encoded_impact = self.__encode_categorical()
+        data_no_link_text = self.__drop_link_text(data_encoded_impact)
+        data_with_target = self.__create_target(data_no_link_text)
+        self.scaled_data = self.__scale_values(data_with_target)
+
+        return self.scaled_data
+
+    def __encode_categorical(self) -> pd.DataFrame:
+        self.data['impact'] = self.data['impact'].map(
+            self.__impact_mapping
+        )
+
+        return self.data
+    
+    @staticmethod
+    def __drop_link_text(data: pd.DataFrame) -> pd.DataFrame:
+        data = data.drop("link_text", axis=1)
+        return data
+
+    @staticmethod
+    def __create_target(data: pd.DataFrame) -> pd.DataFrame:
+        target = []
+        for index, _ in data.iterrows():
+            prices = data.loc[index+1:index+5, "high"]
+            if len(prices) == 5:
+                target.append(max(prices))
+            else:
+                target.append(np.nan)
+        
+        data['target'] = target
+        data=data.copy()
+
+        # drop NaN values
+        data = data.dropna(axis=0)
+        data.reset_index(inplace=True, drop=True)
+
+        return data
+
+    def __scale_values(self, data: pd.DataFrame) -> pd.DataFrame:
+        data_no_time = data.drop('time', axis=1)
+        if self.__train:
+            scaler = MinMaxScaler()
+            scaler.fit(data_no_time)
+            joblib.dump(
+                scaler,
+                self.__scaler_path
+            )
+        else:
+            scaler = joblib.load(self.__scaler_path)
+
+        scaled_data = scaler.transform(data_no_time)
+        scaled_data_df = pd.DataFrame(scaled_data, columns=data_no_time.columns)
+        output_data = pd.concat([data['time'], scaled_data_df], axis=1)
+        return output_data
+
+
 
     
 if __name__ == "__main__":

@@ -19,3 +19,4 @@ langchain-community
 selenium
 beautifulsoup4
 pyyaml
+scikit-learn
