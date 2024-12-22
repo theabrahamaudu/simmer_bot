@@ -11,6 +11,7 @@ from langchain_community.llms import ollama
 from langchain_core.output_parsers import StrOutputParser
 from langchain.prompts import PromptTemplate
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
 from src.utils.data_preprocess_log_config import logger
 
 class LLMSentimentAnalysis:
@@ -60,7 +61,7 @@ class LLMSentimentAnalysis:
             Answer:
         """
 
-    def parse_dataframe(self, pickup: bool=False, pickup_index: int=None) -> None:
+    def parse_dataframe(self, pickup: bool=False, pickup_index: int=None) -> pd.DataFrame:
         logger.info("loading data from %s", self.source_file_path)
         try:
             df = pd.read_csv(self.source_file_path)
@@ -118,6 +119,8 @@ class LLMSentimentAnalysis:
                 self.save_path+"/parsed_scraped_data.csv",
                 e
             )
+
+        return df
         
 
     def __get_response_chain(self) -> RunnableSerializable:
@@ -176,8 +179,9 @@ class TAIndicators:
     def __load_data(self) -> pd.DataFrame:
         return pd.read_csv(self.__source_file_path)
     
-    def add_indicators(self) -> pd.DataFrame:
-        data = self.__load_data()
+    def add_indicators(self, data: pd.DataFrame=None) -> pd.DataFrame:
+        if data is None:
+            data = self.__load_data()
 
         #### Momentum Indicators ####
         # ADX - Average Directional Movement Index
@@ -577,14 +581,12 @@ class TAIndicators:
 class NumericalPreprocess:
     def __init__(
         self,
-        data: pd.DataFrame,
         scaler_path:str='./artefacts/scaler.pkl',
-        train: bool=True,
+        save_path: str = "./data/processed/"
     ) -> None:
-        self.data = data
         self.scaled_data = None
         self.__scaler_path = scaler_path
-        self.__train = train
+        self.__save_path = save_path
         self.__impact_mapping = {
             "Non-Economic": 0,
             "Low Impact Expected": 1,
@@ -592,20 +594,23 @@ class NumericalPreprocess:
             "High Impact Expected": 3,
         }
 
-    def run(self) -> pd.DataFrame:
-        data_encoded_impact = self.__encode_categorical()
+    def run(self, data: pd.DataFrame, train: bool = True, file_name: str = None) -> pd.DataFrame:
+        data_encoded_impact = self.__encode_categorical(data)
         data_no_link_text = self.__drop_link_text(data_encoded_impact)
         data_with_target = self.__create_target(data_no_link_text)
-        self.scaled_data = self.__scale_values(data_with_target)
+        self.scaled_data = self.__scale_values(data_with_target, train)
+        if file_name:
+            self.save_scaled_data(file_name)
 
         return self.scaled_data
 
-    def __encode_categorical(self) -> pd.DataFrame:
-        self.data['impact'] = self.data['impact'].map(
+
+    def __encode_categorical(self, data: pd.DataFrame) -> pd.DataFrame:
+        data['impact'] = data['impact'].map(
             self.__impact_mapping
         )
 
-        return self.data
+        return data
     
     @staticmethod
     def __drop_link_text(data: pd.DataFrame) -> pd.DataFrame:
@@ -631,9 +636,9 @@ class NumericalPreprocess:
 
         return data
 
-    def __scale_values(self, data: pd.DataFrame) -> pd.DataFrame:
+    def __scale_values(self, data: pd.DataFrame, train: bool = True) -> pd.DataFrame:
         data_no_time = data.drop('time', axis=1)
-        if self.__train:
+        if train:
             scaler = MinMaxScaler()
             scaler.fit(data_no_time)
             joblib.dump(
@@ -648,6 +653,19 @@ class NumericalPreprocess:
         output_data = pd.concat([data['time'], scaled_data_df], axis=1)
         return output_data
 
+    def save_scaled_data(self, filename: str) -> None:
+        self.scaled_data.to_csv(self.__save_path + filename + ".csv", index=False)
+        logger.info("scaled data saved to %s", self.__save_path + filename)
+
+
+class SplitData:
+    def __init__(self) -> None:
+        pass
+
+    def raw_split(self, data: pd.DataFrame, ratio: float=0.9) -> tuple[pd.DataFrame, pd.DataFrame]:
+        train_full, test = train_test_split(data, train_size=ratio, shuffle=False)
+        train, validate = train_test_split(train_full, train_size=ratio, shuffle=False)
+        return train, test, validate
 
 
     
