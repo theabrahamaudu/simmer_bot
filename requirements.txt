@@ -15,8 +15,13 @@ ta_lib-0.5.1-cp310-cp310-win_amd64.whl
 tqdm
 pandas
 numpy==1.26.4
+matplotlib
+seaborn
 langchain-community
 selenium
 beautifulsoup4
 pyyaml
-scikit-learn
+scikit-learn==1.5.2
+"tensorflow<2.11"
+xgboost
+lightgbm
