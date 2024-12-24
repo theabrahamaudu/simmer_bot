@@ -91,4 +91,6 @@ target/
 .mypy_cache/
 
 # Model files
-*.h5
+*models/*.h5
+*models/*.ubj
+*models/*.txt
