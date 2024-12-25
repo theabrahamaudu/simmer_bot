@@ -94,3 +94,4 @@ target/
 *models/*.h5
 *models/*.ubj
 *models/*.txt
+*models/*.pkl
