@@ -14,17 +14,27 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from src.utils.data_preprocess_log_config import logger
 
+# ignore warnings
+import warnings
+from pandas.errors import SettingWithCopyWarning, PerformanceWarning
+warnings.simplefilter(action='ignore', category=SettingWithCopyWarning)
+warnings.simplefilter(action='ignore', category=PerformanceWarning)
+
 class LLMSentimentAnalysis:
     def __init__(
             self,
             model_name: str= "mistral-nemo",
-            source_file_path: str = "./data/interim/merged_scrapped_n_price.csv",
-            save_path: str = "./data/interim"
+            source_file_path: str | None = "./data/interim/merged_scrapped_n_price.csv",
+            data: pd.DataFrame | None = None,
+            save_path: str | None = "./data/interim",
+            mock: bool = False
             ):
         logger.info("initializing news sentiment analyzer")
         self.model_name = model_name
         self.source_file_path = source_file_path
+        self.data = data
         self.save_path = save_path
+        self.mock = mock
         self.__prompt_template = """
             You are an expert financial analyst specialized in currency markets, particularly in evaluating
             the impact of news articles on the EURUSD currency pair. Your task is to read the following news
@@ -62,14 +72,19 @@ class LLMSentimentAnalysis:
         """
 
     def parse_dataframe(self, pickup: bool=False, pickup_index: int=None) -> pd.DataFrame:
-        logger.info("loading data from %s", self.source_file_path)
-        try:
-            df = pd.read_csv(self.source_file_path)
-            logger.info("loaded data from %s", self.source_file_path)
-        except Exception as e:
-            logger.error("error loading data from %s:\n %s", self.source_file_path, e)
-        model_calls = 0
+        if self.source_file_path and self.data is None:
+            logger.info("loading data from %s", self.source_file_path)
+            try:
+                df = pd.read_csv(self.source_file_path)
+                logger.info("loaded data from %s", self.source_file_path)
+            except Exception as e:
+                logger.error("error loading data from %s:\n %s", self.source_file_path, e)
 
+        elif self.data is not None:
+            df = self.data
+            logger.info("loaded data from dataframe")
+        
+        model_calls = 0
         if pickup:
             df = df[pickup_index:]
 
@@ -92,7 +107,8 @@ class LLMSentimentAnalysis:
                     if model_calls % 20 == 0:
                         logger.info("model calls: %d", model_calls)
                         logger.info("current index: %d", index)
-                        df.to_csv(self.save_path + "/parsed_scraped_data_temp.csv", index=False)
+                        if self.save_path:
+                            df.to_csv(self.save_path + "/parsed_scraped_data_temp.csv", index=False)
             elapsed_time = time.time() - start_time
             logger.info(
                 "parsed %d news articles in %.2f seconds (%.2f articles per second)",
@@ -105,20 +121,21 @@ class LLMSentimentAnalysis:
             logger.error("error parsing news articles:\n %s", e)
             logger.error("failed at index %d", index)
 
-        try:
-            os.makedirs(self.save_path, exist_ok=True)
-            logger.info("saving parsed data to %s", self.save_path)
-            df.to_csv(self.save_path + "/parsed_scraped_data.csv", index=False)
-            logger.info(
-                "parsed data saved to %s",
-                self.save_path+"/parsed_scraped_data.csv"
-            )
-        except Exception as e:
-            logger.error(
-                "error saving parsed data to %s:\n %s",
-                self.save_path+"/parsed_scraped_data.csv",
-                e
-            )
+        if self.save_path:
+            try:
+                os.makedirs(self.save_path, exist_ok=True)
+                logger.info("saving parsed data to %s", self.save_path)
+                df.to_csv(self.save_path + "/parsed_scraped_data.csv", index=False)
+                logger.info(
+                    "parsed data saved to %s",
+                    self.save_path+"/parsed_scraped_data.csv"
+                )
+            except Exception as e:
+                logger.error(
+                    "error saving parsed data to %s:\n %s",
+                    self.save_path+"/parsed_scraped_data.csv",
+                    e
+                )
 
         return df
         
@@ -139,6 +156,9 @@ class LLMSentimentAnalysis:
         return chain
     
     def news_sentiment(self, article: str) -> np.float32:
+        if self.mock:
+            return np.float32(0.5)
+
         chain = self.__get_response_chain()
         response = chain.invoke(
             {
@@ -582,11 +602,13 @@ class NumericalPreprocess:
     def __init__(
         self,
         scaler_path:str='./artefacts/scaler.pkl',
-        save_path: str = "./data/processed/"
+        save_path: str = "./data/processed/",
+        inference_mode: bool = False
     ) -> None:
         self.scaled_data = None
         self.__scaler_path = scaler_path
         self.__save_path = save_path
+        self.inference_mode = inference_mode
         self.__impact_mapping = {
             "Non-Economic": 0,
             "Low Impact Expected": 1,
@@ -595,10 +617,11 @@ class NumericalPreprocess:
         }
 
     def run(self, data: pd.DataFrame, train: bool = True, file_name: str = None) -> pd.DataFrame:
-        data_encoded_impact = self.__encode_categorical(data)
-        data_no_link_text = self.__drop_link_text(data_encoded_impact)
-        data_with_target = self.__create_target(data_no_link_text)
-        self.scaled_data = self.__scale_values(data_with_target, train)
+        data = self.__encode_categorical(data)
+        data = self.__drop_link_text(data)
+        if not self.inference_mode:
+            data = self.__create_target(data)
+        self.scaled_data = self.__scale_values(data, train)
         if file_name:
             self.save_scaled_data(file_name)
 
@@ -637,6 +660,7 @@ class NumericalPreprocess:
         return data
 
     def __scale_values(self, data: pd.DataFrame, train: bool = True) -> pd.DataFrame:
+        time_data = data['time']
         data_no_time = data.drop('time', axis=1)
         if train:
             scaler = MinMaxScaler()
@@ -646,11 +670,20 @@ class NumericalPreprocess:
                 self.__scaler_path
             )
         else:
-            scaler = joblib.load(self.__scaler_path)
+            scaler: MinMaxScaler = joblib.load(self.__scaler_path)
+            if self.inference_mode:
+                data_no_time['target'] = np.zeros(len(data_no_time))
+
+            scaled_data = scaler.transform(data_no_time)
+            scaled_data_df = pd.DataFrame(scaled_data, columns=data_no_time.columns)
+            output_data = pd.concat([time_data, scaled_data_df], axis=1)
+            if self.inference_mode:
+                output_data.drop('target', axis=1, inplace=True)
+            return output_data
 
         scaled_data = scaler.transform(data_no_time)
         scaled_data_df = pd.DataFrame(scaled_data, columns=data_no_time.columns)
-        output_data = pd.concat([data['time'], scaled_data_df], axis=1)
+        output_data = pd.concat([time_data, scaled_data_df], axis=1)
         return output_data
 
     def save_scaled_data(self, filename: str) -> None:

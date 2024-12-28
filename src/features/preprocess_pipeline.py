@@ -41,17 +41,17 @@ class TrainPreprocessPipeline:
 
         # Numerical preprocessing
         train_preprocessed = self.numerical_preprocess.run(
-            train,
+            data=train,
             file_name="train_preprocessed"
         )
 
         test_preprocessed = self.numerical_preprocess.run(
-            test,
+            data=test,
             train=False,
             file_name="test_preprocessed"
         )
         validate_preprocessed = self.numerical_preprocess.run(
-            validate,
+            data=validate,
             train=False,
             file_name="validate_preprocessed"
         )
@@ -124,19 +124,66 @@ class TrainPreprocessPipeline:
 class InferencePreprocessPipeline:
     def __init__(self, data: pd.DataFrame):
         self.data = data
-        self.llm_sentiment_analysis = LLMSentimentAnalysis()
+        self.llm_sentiment_analysis = LLMSentimentAnalysis(
+            data=self.data,
+            save_path=None,
+            mock=True)
         self.ta_indicators = TAIndicators()
-        self.numerical_preprocess = NumericalPreprocess()
+        self.numerical_preprocess = NumericalPreprocess(
+            inference_mode=True
+        )
     
-    def run(self):
-        data = self.llm_sentiment_analysis.parse_dataframe(self.data)
+    def run(self,
+            lookback: int = 6,
+            target_column: str = "target"
+        ) -> pd.DataFrame:
+        """
+        Runs the inference preprocessing pipeline.
+        """
+        data = self.llm_sentiment_analysis.parse_dataframe()
         data = self.ta_indicators.add_indicators(data)
         data = self.numerical_preprocess.run(
             data,
             train=False
         )
+        data = self.__prepare_time_series_data(data, lookback, target_column)
         
-        return 
+        return data
+
+    @staticmethod
+    def __prepare_time_series_data(df: pd.DataFrame, n: int, target_column: str) -> pd.DataFrame:
+        """
+        Prepares time series data using the last n timestamps and the current timestamp
+        to predict the target column.
+
+        Args:
+        - df (pd.DataFrame): The input data containing timestamps and feature columns.
+        - n (int): The number of previous timestamps to use as features.
+        - target_column (str): The name of the target column.
+
+        Returns:
+        - pd.DataFrame: A DataFrame where each row contains n+1 timestamps of features and the target value.
+        """
+        feature_columns = [col for col in df.columns if col != target_column and col != 'time']
+        data = []
+        columns = []
+
+        # Generate column names for the reorganized DataFrame
+        for i in range(n, 0, -1):
+            columns += [f"{col}_t-{i}" for col in feature_columns]
+        columns += [f"{col}_t" for col in feature_columns]  # Add current timestep features
+
+        # Populate the rows with shifted data
+        for i in tqdm(range(n, len(df)),
+                desc="Preparing time series data",
+                total=len(df),
+                unit=" rows"
+                ):
+            row_features = df.iloc[i-n:i][feature_columns].values.flatten()  # Last n timesteps
+            current_features = df.iloc[i][feature_columns].values  # Current timestep
+            data.append(list(row_features) + list(current_features))
+        
+        return pd.DataFrame(data, columns=columns) 
     
 if __name__ == "__main__":
     pipeline = TrainPreprocessPipeline()

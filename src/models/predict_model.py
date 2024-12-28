@@ -71,7 +71,8 @@ class PredictModel:
         xgb_preds = self.xgb_model.predict(data)
         lgb_preds = self.lgb_model.predict(data)
         gru_preds = self.gru_model.predict(
-            data.to_numpy().reshape(-1, 1, (data.shape[1]))
+            data.to_numpy().reshape(-1, 1, (data.shape[1])),
+            verbose=0
         ).flatten()
 
         return pd.DataFrame({

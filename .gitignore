@@ -79,6 +79,7 @@ target/
 
 # exclude data from source control by default
 *.csv
+*data/processed/*.pkl
 
 # Mac OS-specific storage files
 .DS_Store
