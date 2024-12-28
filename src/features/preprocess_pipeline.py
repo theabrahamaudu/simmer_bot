@@ -40,6 +40,7 @@ class TrainPreprocessPipeline:
             self,
             lookback: int = 6,
             target_column: str = "target",
+            save_path: str = "./data/processed/",
             with_llm_sentiment: bool = False
         ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
@@ -87,7 +88,7 @@ class TrainPreprocessPipeline:
             train_preprocessed, lookback, target_column
         )
         train_preprocessed.to_csv(
-            "./data/processed/series_train_preprocessed.csv", index=False
+            save_path + "series_train_preprocessed.csv", index=False
         )
         
         # test
@@ -95,7 +96,7 @@ class TrainPreprocessPipeline:
             test_preprocessed, lookback, target_column
         )
         test_preprocessed.to_csv(
-            "./data/processed/series_test_preprocessed.csv", index=False
+            save_path + "series_test_preprocessed.csv", index=False
         )
         
         # validation
@@ -103,7 +104,7 @@ class TrainPreprocessPipeline:
             validate_preprocessed, lookback, target_column
         )
         validate_preprocessed.to_csv(
-            "./data/processed/series_validate_preprocessed.csv", index=False
+            save_path + "series_validate_preprocessed.csv", index=False
         )
         logger.info("TrainPreprocessPipeline completed")
         return train_preprocessed, test_preprocessed, validate_preprocessed

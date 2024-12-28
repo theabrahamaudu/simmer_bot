@@ -1,5 +1,7 @@
 from .preprocess_pipeline import TrainPreprocessPipeline
 
 if __name__ == "__main__":
-    pipeline = TrainPreprocessPipeline()
-    pipeline.run(with_llm_sentiment=True)
+    pipeline = TrainPreprocessPipeline(
+
+    )
+    _, _, _ = pipeline.run(with_llm_sentiment=True)
