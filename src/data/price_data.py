@@ -1,5 +1,5 @@
 """
-Module to download price and news data
+Module to download price data
 """
 
 import os
@@ -10,6 +10,9 @@ import numpy as np
 from src.utils.data_fetch_log_config import logger
 
 class PriceData:
+    """
+    Class to download price data from broker
+    """
     def __init__(self, symbol: str):
         self.symbol = symbol
         self.__login = os.environ.get("LOGIN", None)
@@ -18,6 +21,15 @@ class PriceData:
         self.__setup()
 
     def __setup(self):
+        """
+        Initializes and logs into the account on the specified server.
+
+        This method sets up the connection by initializing and logging into the 
+        trading account using the provided login credentials and server details.
+
+        Raises:
+            Exception: If an error occurs during initialization or login, it is logged.
+        """
         try:
             logger.info(
                 f"initializing and logging into account -> {self.__login} on server -> {self.__server}"
@@ -98,6 +110,25 @@ class PriceData:
             print("error fetching price data from MT5 server")
 
     def save(self, price_array: np.ndarray, path: str):
+        """
+        Saves the given price data array to a CSV file after converting the timestamp to a readable datetime format.
+
+        Args:
+            price_array (np.ndarray): A NumPy array containing the price data, where one of the columns is a timestamp in seconds.
+            path (str): The file path where the CSV file will be saved.
+
+        Returns:
+            None: The function saves the data to a CSV file at the specified path.
+
+        Behavior:
+            - Creates any necessary directories for the file path if they don't already exist.
+            - Converts the 'time' column from Unix timestamp (seconds) to a readable datetime format.
+            - Saves the data to a CSV file without the index.
+        
+        Logs:
+            - Logs an info message indicating successful saving of price data.
+            - Logs an error message if an exception occurs while saving the data.
+        """
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             price_df = pd.DataFrame(price_array)
@@ -105,7 +136,6 @@ class PriceData:
             price_df.to_csv(path, index=False)
             logger.info(f"price data saved to {path}")
         except Exception as e:
-            print(f"error saving price data to {path}", e)
             logger.error(f"error saving price data to {path}:\n {e}")
 
 if __name__ == "__main__":

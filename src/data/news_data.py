@@ -12,12 +12,29 @@ from src.utils.data_fetch_log_config import logger
 
 
 class NewsData:
+    """
+    Class to scrape news data from forex factory
+    """
     def __init__(self, symbols: list[str], save_path: str = None):
         self.symbols = symbols
         self.save_path = save_path
 
 
     def scrape_news(self, start_year: int, end_year: int, pickup_idx: int = None) -> None:
+        """
+        Scrapes news data from the Forex Factory website for a specified date range.
+
+        Args:
+            start_year (int): The start year of the date range to scrape.
+            end_year (int): The end year of the date range to scrape.
+            pickup_idx (int, optional): The starting index of the date range. If provided, 
+                                        skips earlier ranges.
+
+        Generates date ranges, fetches news data for each range, and saves the data to CSV files.
+
+        Raises:
+            Exception: Logs and handles errors encountered during scraping.
+        """
 
         date_ranges = self.__generate_date_ranges(start_year, end_year)
 
@@ -51,7 +68,6 @@ class NewsData:
                 logger.info("%s news data fetched for %s", len(news_list), date_range)
                 pd.DataFrame(news_list).to_csv(f"{self.save_path}/news_{date_range}.csv", index=False)
                 logger.info("news data saved to news_%s.csv", date_range)
-                print(f"error fetching news data for {date_range}", e)
                 logger.error("error fetching news data for %s:\n %s", date_range, e)
                 self.wd.quit()
 
@@ -60,7 +76,25 @@ class NewsData:
             source_path: str = "./data/raw",
             save_path: str = "./data/interim"
         ) -> None:
+        """
+        Extracts and saves the text of news articles from links in raw news data CSV files.
 
+        Args:
+            source_path (str): Path to the directory containing raw CSV files. Default is "./data/raw".
+            save_path (str): Path to the directory where updated CSV files with article texts 
+                            will be saved. Default is "./data/interim".
+
+        Processes each CSV file to fetch article texts from the URLs provided in the "links" column 
+        and appends the text to a new "link_text" column in the same file.
+
+        Logs:
+            - Number of unparsed CSV files found.
+            - Processing status of each file.
+            - Number of rows and texts updated.
+
+        Raises:
+            Exception: Logs and handles errors during file loading, text extraction, or file saving.
+        """
         self.__configure_webdriver()
 
         logger.info("loading news data from %s", source_path)
@@ -80,7 +114,6 @@ class NewsData:
                 load_status = True
             except Exception as e:
                 load_status = False
-                print(f"error loading news data for {csv_file}", e)
                 logger.error("error loading news data for %s:\n %s", csv_file, e)
 
             if load_status:
@@ -111,13 +144,25 @@ class NewsData:
                     )
                     success_count += 1
                 except Exception as e:
-                    print(f"error getting news article texts for {csv_file}", e)
                     logger.error("error getting news article texts for %s:\n %s", csv_file, e)
         logger.info("fetched news article texts for %s date ranges", success_count)
         self.wd.quit()
 
 
     def __configure_webdriver(self) -> None:
+        """
+        Configures the Selenium WebDriver for headless Firefox browsing.
+
+        Initializes a headless Firefox WebDriver with a non-blocking page load strategy 
+        and maximizes the browser window.
+
+        Logs:
+            - Success message upon successful configuration.
+            - Error message if an exception occurs during configuration.
+
+        Raises:
+            Exception: Logs and handles errors that occur during WebDriver setup.
+        """
         try:
             options = webdriver.FirefoxOptions()
             options.page_load_strategy = 'none'
@@ -126,12 +171,32 @@ class NewsData:
             self.wd.maximize_window()
             logger.info("webdriver configured")
         except Exception as e:
-            print("error configuring webdriver", e)
             logger.error("error configuring webdriver:\n %s", e)
 
 
     def __get_page(self, url: str) -> WebElement:
-        print("i got to __get_page")
+        """
+        Loads a webpage in the Selenium WebDriver and waits for it to fully load.
+
+        Args:
+            url (str): The URL of the webpage to load.
+
+        Returns:
+            WebElement: The WebDriver instance after loading the page.
+
+        Behavior:
+            - Clears all cookies and navigates to the specified URL.
+            - Waits for the page's `document.readyState` to be "complete".
+            - Ensures specific elements are present on the page before proceeding.
+            - Stops further page loading after the initial content is ready.
+
+        Logs:
+            - Success message when the page is successfully loaded.
+            - Error message if an exception occurs during page loading.
+
+        Raises:
+            Exception: Logs and handles errors during page loading.
+        """
         try:
             logger.info("loading page -> %s", url)
             self.wd.delete_all_cookies()
@@ -151,19 +216,47 @@ class NewsData:
             logger.info("page loaded -> %s", url)
             return self.wd
         except Exception as e:
-            print(f"error loading page -> {url}", e)
             logger.error("error loading page -> %s:\n %s", url, e)
             return self.wd
 
     def __get_day_news(self) -> list[WebElement]:
-        print ("i got to __get_day_news")
+        """
+        Retrieves daily news elements from the loaded webpage.
+
+        Returns:
+            list[WebElement]: A list of WebElements representing the daily news sections 
+                            (found within `tbody` tags).
+
+        Logs:
+            - Debug message indicating method execution.
+
+        Raises:
+            Exception: Any WebDriver-related issues will propagate to the caller.
+        """
+
         return self.wd.find_elements(
             By.TAG_NAME,
             "tbody"
         )
 
     def __get_news_rows(self, day_news: WebElement) -> tuple[list[WebElement], str]:
-        print("i got to __get_news_rows")
+        """
+        Extracts rows of news data and the corresponding date from a daily news section.
+
+        Args:
+            day_news (WebElement): The WebElement representing the daily news section.
+
+        Returns:
+            tuple[list[WebElement], str]: 
+                - A list of WebElements representing the rows of news data.
+                - A string representing the date of the news.
+
+        Logs:
+            - Error message if an exception occurs during extraction.
+
+        Raises:
+            Exception: Logs and handles errors during row and date extraction.
+        """
         try:
             rows = day_news.find_elements(
                 By.TAG_NAME,
@@ -176,28 +269,50 @@ class NewsData:
 
             return rows, date
         except Exception as e:
-            print("error getting news rows", e)
+            logger.error("error getting news rows:\n %s", e)
             return [], ""
 
     def __get_row_data(self, row: WebElement) -> dict:
-        print("i got to __get_row_data")
+        """
+        Extracts data from a single row in the news section.
+
+        Args:
+            row (WebElement): The WebElement representing a row of news data.
+
+        Returns:
+            dict: A dictionary containing:
+                - "date" (str): Placeholder for the date (populated externally).
+                - "timestamp" (str): The time associated with the news.
+                - "symbol" (str): The currency symbol related to the news.
+                - "impact" (str): The economic impact level (retrieved from the tooltip).
+                - "links" (list): A list of URLs extracted from the row.
+
+            If the symbol is not relevant, returns an empty dictionary structure.
+
+        Logs:
+            - Debug messages for successful processing steps.
+            - Error message if an exception occurs during data extraction.
+
+        Raises:
+            Exception: Logs and handles errors during row data extraction.
+        """
         try:
             symbol = row.find_element(
                 By.CLASS_NAME,
                 "calendar__currency"
             )
-            print("i got past symbol")
+
             if symbol.text in self.symbols:
                 timestamp = row.find_element(
                                 By.CLASS_NAME,
                                 "calendar__time"
                             ).text
-                print("i got past timestamp")
+
                 impact = row.find_element(
                             By.CSS_SELECTOR,
                             "td.calendar__cell.calendar__impact span[title]"
                         ).get_attribute("title")
-                print("i got past impact")
+
                 links = self.__get_row_links(row)
 
                 return {
@@ -216,7 +331,7 @@ class NewsData:
                     "links": []
                 }
         except Exception as e:
-            print("error getting row data", e)
+            logger.error("error getting row data -> %s", e)
             return {
                     "date": "",
                     "timestamp": "",
@@ -226,7 +341,27 @@ class NewsData:
                 }
 
     def __get_row_links(self, row: WebElement) -> list[str]:
-        print("i got to __get_row_links")
+        """
+        Extracts related story links from a news row.
+
+        Args:
+            row (WebElement): The WebElement representing a row of news data.
+
+        Returns:
+            list[str]: A list of URLs (strings) pointing to related news articles.
+
+        Behavior:
+            - Clicks the detail button in the row to reveal additional information.
+            - Waits for the related stories section to load.
+            - Extracts links from the "flexposts__storydisplay-info" elements.
+
+        Logs:
+            - Debug messages indicating progress through the method.
+            - Error message if an exception occurs during link extraction.
+
+        Raises:
+            Exception: Logs and handles errors encountered during link retrieval.
+        """
         try:
             # click the detail button
             row.find_element(By.CLASS_NAME, "calendar__detail").click()
@@ -258,10 +393,34 @@ class NewsData:
 
             return links
         except Exception as e:
-            print("error getting row links", e)
+            logger.error("error getting row links:\n %s", e)
             return []
         
     def __get_link_text(self, link: str) -> str:
+        """
+        Extracts the text content from a given news link.
+
+        Args:
+            link (str): The URL of the news article to extract content from.
+
+        Returns:
+            str: The extracted text content of the article. Returns an empty string 
+                if the source is a YouTube link or if an error occurs.
+
+        Behavior:
+            - Opens a new browser tab and navigates to the specified link.
+            - Waits for the page content to load.
+            - Checks the source of the news article to ensure it's not YouTube.
+            - Extracts text content from the "news__copy" class.
+            - Closes the tab and switches back to the original tab.
+
+        Logs:
+            - Info message if a YouTube link is skipped.
+            - Error message if an exception occurs during the text extraction process.
+
+        Raises:
+            Exception: Logs and handles errors, reinitializes the WebDriver upon failure.
+        """
         try:
             # Open a new tab
             self.wd.execute_script("window.open('');")
@@ -299,7 +458,7 @@ class NewsData:
                 
                 # Switch back to the original tab
                 self.wd.switch_to.window(self.wd.window_handles[0])
-                print("youtube link, skipping...")
+                logger.info("youtube link, skipping...")
                 return ""
 
         except Exception as e:
@@ -308,7 +467,7 @@ class NewsData:
 
             # Switch back to the original tab
             self.wd.switch_to.window(self.wd.window_handles[0])
-            print("error getting link text", e)
+            logger.error("error getting link text:\n %s", e)
             self.wd.quit()
             self.__configure_webdriver()
             return ""
@@ -316,15 +475,29 @@ class NewsData:
 
     @staticmethod
     def __scanDir(directory: str, extension: str, check_dir: str = None, pickup: bool = False) -> list[str]:
-        """Check specified directory and return list of files with
-        specified extension
+        """
+        Scans a directory for files with a specified extension, with optional filtering based on another directory.
 
         Args:
-            extension (str): extension type to be searched for e.g. ".txt"
+            directory (str): The path to the directory to scan.
+            extension (str): The file extension to filter by (e.g., ".csv").
+            check_dir (str, optional): A directory to compare file names against for exclusion. Default is None.
+            pickup (bool, optional): If True, filters files not already present in the `check_dir`. Default is False.
 
         Returns:
-            list: strings of file names with specified extension
-        """    
+            list[str]: A sorted list of filenames that match the criteria.
+
+        Behavior:
+            - If `pickup` is True, only files in the source directory but not in the `check_dir` are included.
+            - If `pickup` is False, all files containing "news" and having the specified extension are included.
+            - The list of matching files is sorted alphabetically.
+
+        Logs:
+            - Logs the number of matching files found.
+
+        Raises:
+            None: Returns an empty list if no files match the criteria.
+        """
         files: list = []
         if pickup:
             check_list = os.listdir(check_dir)
@@ -337,10 +510,33 @@ class NewsData:
                 if filename.endswith(extension) and "news" in filename:
                     files.append(filename)
         files.sort()
+        logger.info("found %s files", len(files))
         return files
     
     @staticmethod
     def __generate_date_ranges(start_year: int, end_year: int) -> list[str]:
+    def __generate_date_ranges(start_year: int, end_year: int) -> list[str]:
+        """
+        Generates a list of weekly date ranges between the specified start and end years.
+
+        Args:
+            start_year (int): The start year for generating the date ranges.
+            end_year (int): The end year for generating the date ranges.
+
+        Returns:
+            list[str]: A list of weekly date ranges formatted as "MMMDD.YYYY-MMMDD.YYYY" (e.g., "jan01.2024-jan07.2024").
+
+        Behavior:
+            - For each year between `start_year` and `end_year`, weekly date ranges are created.
+            - Each range starts on a Monday and ends on the following Sunday, ensuring the date range does not exceed the year's final date.
+
+        Example:
+            If the years are 2024 to 2025, the function will return weekly date ranges like:
+            ["jan01.2024-jan07.2024", "jan08.2024-jan14.2024", ...].
+
+        Raises:
+            None: Returns an empty list if the range is invalid.
+        """
         date_ranges = []
 
         # Iterate year by year
@@ -371,6 +567,28 @@ class NewsData:
 
     @staticmethod
     def __clean_date_time(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Cleans and formats the 'timestamp' and 'date' columns in the DataFrame, 
+        combining them into a single 'datetime' column.
+
+        Args:
+            df (pd.DataFrame): The DataFrame containing 'date' and 'timestamp' columns to be cleaned.
+
+        Returns:
+            pd.DataFrame: The DataFrame with an updated 'datetime' column and cleaned 'timestamp' values.
+
+        Behavior:
+            - The function first handles rows with invalid or missing timestamps by filling in the first valid timestamp.
+            - Then, it iterates over the rows, filling in any missing timestamps with the previous valid timestamp.
+            - The 'date' and 'timestamp' columns are combined into a single 'datetime' column, formatted as a `datetime` object.
+
+        Example:
+            Given a DataFrame with columns "date" and "timestamp", the function will add a new "datetime" column 
+            with the combined and cleaned values.
+
+        Raises:
+            ValueError: If there are issues in parsing the date-time format.
+        """
         # Handle leading rows with incorrect timestamps
         first_valid_index = df[df["timestamp"].str.contains("am|pm", na=False)].index.min()
         if first_valid_index is not None:
@@ -396,7 +614,27 @@ class NewsData:
             self,
             source_path: str = "./data/interim",
             save_path: str = "./data/interim") -> None:
-        
+        """
+        Combines multiple CSV files containing news data into a single DataFrame 
+        and saves the combined data to a new CSV file.
+
+        Args:
+            source_path (str, optional): The directory path where the source CSV files are located. Default is "./data/interim".
+            save_path (str, optional): The directory path where the combined CSV file will be saved. Default is "./data/interim".
+
+        Returns:
+            None: The function saves the combined DataFrame as a CSV file.
+
+        Behavior:
+            - Scans the specified directory for CSV files.
+            - For each file, reads the content into a DataFrame, cleans the data, and appends it to a list.
+            - Skips empty or invalid files and logs warnings for skipped files.
+            - Combines all valid DataFrames into one and saves the result to a new CSV file.
+
+        Logs:
+            - Logs the number of files processed, skipped, and successfully combined.
+            - Logs warnings for any issues with specific CSV files.
+        """
         files = self.__scanDir(source_path, ".csv")
         logger.info("found %s csv files", len(files))
 

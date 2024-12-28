@@ -18,6 +18,18 @@ class TrainPreprocessPipeline:
         self.split_data = SplitData()
     
     def __load_data(self) -> pd.DataFrame:
+        """
+        Loads data from the specified file path.
+
+        Args:
+            None
+
+        Returns:
+            pd.DataFrame: The loaded data from the CSV file.
+
+        Raises:
+            FileNotFoundError: If the file specified in the source file path does not exist.
+        """
         logger.info("Loading data from %s", self.__source_file_path)
         try:
             return pd.read_csv(self.__source_file_path)
@@ -31,7 +43,20 @@ class TrainPreprocessPipeline:
             with_llm_sentiment: bool = False
         ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
-        Runs the preprocessing pipeline.
+        Runs the preprocessing pipeline to process raw data, apply sentiment analysis (optional), 
+        add technical analysis indicators, and prepare time series data for training, testing, and validation.
+
+        Args:
+            lookback (int): The number of previous time steps to use when preparing time series data. Defaults to 6.
+            target_column (str): The name of the target column in the dataset. Defaults to "target".
+            with_llm_sentiment (bool): Whether to include sentiment analysis from an LLM. Defaults to False.
+
+        Returns:
+            tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+                A tuple containing the preprocessed DataFrames for training, testing, and validation data.
+
+        Raises:
+            Any errors encountered during data loading, preprocessing, or time series preparation will be logged.
         """
         data = self.__load_data()
         if with_llm_sentiment:
@@ -138,7 +163,19 @@ class InferencePreprocessPipeline:
             target_column: str = "target"
         ) -> pd.DataFrame:
         """
-        Runs the inference preprocessing pipeline.
+        Runs the inference preprocessing pipeline to process the input data, 
+        apply sentiment analysis, add technical analysis indicators, and prepare 
+        the data for time series prediction.
+
+        Args:
+            lookback (int): The number of previous time steps to use when preparing time series data. Defaults to 6.
+            target_column (str): The name of the target column in the dataset. Defaults to "target".
+
+        Returns:
+            pd.DataFrame: The preprocessed data ready for inference.
+
+        Raises:
+            Any errors encountered during preprocessing steps will be logged.
         """
         data = self.llm_sentiment_analysis.parse_dataframe()
         data = self.ta_indicators.add_indicators(data)
@@ -147,6 +184,7 @@ class InferencePreprocessPipeline:
             train=False
         )
         data = self.__prepare_time_series_data(data, lookback, target_column)
+        logger.info("InferencePreprocessPipeline completed")
         
         return data
 

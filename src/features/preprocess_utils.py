@@ -21,6 +21,9 @@ warnings.simplefilter(action='ignore', category=SettingWithCopyWarning)
 warnings.simplefilter(action='ignore', category=PerformanceWarning)
 
 class LLMSentimentAnalysis:
+    """
+    Class for sentiment analysis using LLM
+    """
     def __init__(
             self,
             model_name: str= "mistral-nemo",
@@ -72,6 +75,30 @@ class LLMSentimentAnalysis:
         """
 
     def parse_dataframe(self, pickup: bool=False, pickup_index: int=None) -> pd.DataFrame:
+        """
+        Parses news articles from a CSV file or DataFrame, performs sentiment analysis on each article, 
+        and adds a sentiment score to the DataFrame. Optionally, it can resume parsing from a specific index 
+        if pickup is enabled.
+
+        Args:
+            pickup (bool): If True, the function will start parsing from the specified `pickup_index`. 
+                            Defaults to False.
+            pickup_index (int): The index from which to start parsing if `pickup` is True. Defaults to None.
+        
+        Returns:
+            pd.DataFrame: A DataFrame containing the original data with added sentiment scores for each news article.
+
+        Raises:
+            Exception: If there is an error during loading, parsing, or saving the data, an error will be logged.
+            
+        Logs:
+            - Logs the process of loading data from CSV or DataFrame.
+            - Logs the parsing progress, including the number of sentiment analysis model calls.
+            - Logs the time taken to process the articles.
+            - Logs errors and provides details on the failure point if any.
+            - Saves intermediate results every 20 model calls to a temporary file if `pickup` is True.
+            - Saves the final parsed data to a specified save path.
+        """
         if self.source_file_path and self.data is None:
             logger.info("loading data from %s", self.source_file_path)
             try:
@@ -141,6 +168,17 @@ class LLMSentimentAnalysis:
         
 
     def __get_response_chain(self) -> RunnableSerializable:
+        """
+        Constructs and returns a response chain using the Ollama model and a prompt template.
+
+        This method sets up a chain of operations that involves the following steps:
+        - Initializes an Ollama model with a specified `model_name` and a temperature of 0.0 for deterministic responses.
+        - Uses a `PromptTemplate` to format the input for the model with the variable `article`.
+        - Combines the prompt template, model, and a string output parser into a chain for processing.
+
+        Returns:
+            RunnableSerializable: A chain that processes an article input, passes it through the Ollama model, and parses the output into a string.
+        """
         model = ollama.Ollama(
             model=self.model_name,
             temperature=0.0,
@@ -156,6 +194,18 @@ class LLMSentimentAnalysis:
         return chain
     
     def news_sentiment(self, article: str) -> np.float32:
+        """
+        Analyzes the sentiment of a news article.
+
+        If `mock` is enabled, returns a neutral sentiment of 0.5. Otherwise, it cleans the article text,
+        processes it through a sentiment analysis model, and returns a sentiment score between 0 and 1.
+
+        Args:
+            article (str): The news article text to analyze.
+
+        Returns:
+            np.float32: The sentiment score, clamped between 0.0 and 1.0.
+        """
         if self.mock:
             return np.float32(0.5)
 
@@ -184,6 +234,15 @@ class LLMSentimentAnalysis:
 
     @staticmethod
     def __clean_text(text: str) -> str:
+        """
+        Cleans the input text by removing non-ASCII characters and truncating to 7000 characters.
+
+        Args:
+            text (str): The text to be cleaned.
+
+        Returns:
+            str: The cleaned text, with non-ASCII characters replaced by spaces and truncated to 7000 characters.
+        """
         return re.sub(r'[^\x20-\x7E]+', ' ', text)[:7000]
 
 
@@ -191,15 +250,35 @@ class TAIndicators:
     def __init__(
             self,
             source_file_path: str = "./data/interim/parsed_scraped_data_clipped.csv",
-            save_path: str = "./data/interim"
         ) -> None:
         self.__source_file_path = source_file_path
-        self.__save_path = save_path
 
     def __load_data(self) -> pd.DataFrame:
+        """
+        Loads data from a CSV file into a pandas DataFrame.
+
+        Returns:
+            pd.DataFrame: The DataFrame containing the data loaded from the CSV file.
+        """
         return pd.read_csv(self.__source_file_path)
     
     def add_indicators(self, data: pd.DataFrame=None) -> pd.DataFrame:
+        """
+        Adds various technical indicators to the given stock market data.
+
+        The method calculates and adds multiple momentum, volatility, price transform,
+        and overlap studies indicators to the provided DataFrame or to the data 
+        loaded from a file if no DataFrame is provided.
+
+        Args:
+            data (pd.DataFrame, optional): The stock market data to which indicators 
+                                            will be added. If None, data is loaded 
+                                            from the source file.
+
+        Returns:
+            pd.DataFrame: A DataFrame with the original stock market data along with 
+                        additional columns for each calculated technical indicator.
+        """
         if data is None:
             data = self.__load_data()
 
@@ -599,6 +678,9 @@ class TAIndicators:
 
 
 class NumericalPreprocess:
+    """
+    Class to preprocess numerical data
+    """
     def __init__(
         self,
         scaler_path:str='./artefacts/scaler.pkl',
@@ -617,6 +699,22 @@ class NumericalPreprocess:
         }
 
     def run(self, data: pd.DataFrame, train: bool = True, file_name: str = None) -> pd.DataFrame:
+        """
+        Prepares and processes the input data by applying encoding, scaling, and target creation.
+
+        This method performs encoding of categorical variables, removes specific text links, 
+        creates the target variable (if not in inference mode), scales the data, and optionally 
+        saves the scaled data to a file.
+
+        Args:
+            data (pd.DataFrame): The input data to be processed.
+            train (bool, optional): Whether the data is for training (default is True). 
+                                    If False, the target is not created.
+            file_name (str, optional): The file name to save the scaled data to (default is None).
+
+        Returns:
+            pd.DataFrame: The scaled data, with all necessary preprocessing applied.
+        """
         data = self.__encode_categorical(data)
         data = self.__drop_link_text(data)
         if not self.inference_mode:
@@ -629,6 +727,18 @@ class NumericalPreprocess:
 
 
     def __encode_categorical(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Encodes categorical values in the input data.
+
+        This method maps the 'impact' column of the data using a predefined mapping 
+        (`__impact_mapping`), converting categorical values to numerical representations.
+
+        Args:
+            data (pd.DataFrame): The input data with categorical values to be encoded.
+
+        Returns:
+            pd.DataFrame: The input data with the 'impact' column encoded.
+        """
         data['impact'] = data['impact'].map(
             self.__impact_mapping
         )
@@ -637,11 +747,29 @@ class NumericalPreprocess:
     
     @staticmethod
     def __drop_link_text(data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Removes the 'link_text' column from the DataFrame.
+
+        Args:
+            data (pd.DataFrame): Input DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame without the 'link_text' column.
+        """
         data = data.drop("link_text", axis=1)
         return data
 
     @staticmethod
     def __create_target(data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Creates a target column by finding the maximum 'high' price from the current row and next 4 rows.
+
+        Args:
+            data (pd.DataFrame): Input DataFrame containing a 'high' column.
+
+        Returns:
+            pd.DataFrame: DataFrame with the 'target' column added and NaN rows removed.
+        """
         target = []
         for index, _ in data.iterrows():
             prices = data.loc[index+1:index+5, "high"]
@@ -660,6 +788,17 @@ class NumericalPreprocess:
         return data
 
     def __scale_values(self, data: pd.DataFrame, train: bool = True) -> pd.DataFrame:
+        """
+        Scales the feature values of the input data using MinMaxScaler. If `train` is True, a new scaler is fitted 
+        and saved, otherwise the existing scaler is used to transform the data.
+
+        Args:
+            data (pd.DataFrame): Input data with features and a `time` column.
+            train (bool, optional): If True, fit a new scaler; if False, use the saved scaler for transformation.
+
+        Returns:
+            pd.DataFrame: Scaled data with `time` column preserved. `target` is dropped if in inference mode.
+        """
         time_data = data['time']
         data_no_time = data.drop('time', axis=1)
         if train:
@@ -687,6 +826,7 @@ class NumericalPreprocess:
         return output_data
 
     def save_scaled_data(self, filename: str) -> None:
+        """Saves the scaled data to a CSV file with the specified filename."""
         self.scaled_data.to_csv(self.__save_path + filename + ".csv", index=False)
         logger.info("scaled data saved to %s", self.__save_path + filename)
 
@@ -696,12 +836,8 @@ class SplitData:
         pass
 
     def raw_split(self, data: pd.DataFrame, ratio: float=0.9) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """Splits data into train, validation, and test sets based on the given ratio."""
         train_full, test = train_test_split(data, train_size=ratio, shuffle=False)
         train, validate = train_test_split(train_full, train_size=ratio, shuffle=False)
         return train, test, validate
 
-
-    
-if __name__ == "__main__":
-    llm_sentiment_analyzer = LLMSentimentAnalysis()
-    llm_sentiment_analyzer.parse_dataframe()
