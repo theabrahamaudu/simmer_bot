@@ -1,0 +1,4 @@
+symbol: "EURUSD"
+timeframe: 15
+start: [2014, 1, 1]
+end: [2024, 11, 18]

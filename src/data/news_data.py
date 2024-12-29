@@ -515,7 +515,6 @@ class NewsData:
     
     @staticmethod
     def __generate_date_ranges(start_year: int, end_year: int) -> list[str]:
-    def __generate_date_ranges(start_year: int, end_year: int) -> list[str]:
         """
         Generates a list of weekly date ranges between the specified start and end years.
 

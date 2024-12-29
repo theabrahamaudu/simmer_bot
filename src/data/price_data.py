@@ -44,7 +44,7 @@ class PriceData:
         except Exception as e:
             logger.error(f"Error initializing and logging into account -> {self.__login}: {e}")
 
-    def fetch(self, start_date: dt, end_date: dt, timeframe: int) -> np.ndarray:
+    def fetch(self, start_date: list, end_date: list, timeframe: int) -> np.ndarray:
         """Fetch all price data from start to end date range
 
         Args:
@@ -55,9 +55,11 @@ class PriceData:
         Returns:
             np.ndarray: _description_
         """
+        start_date = dt(start_date[0], start_date[1], start_date[2])
         start_date = start_date.strftime("%Y-%m-%d %H:%M:%S.%f")
         start_date = dt.strptime(start_date, "%Y-%m-%d %H:%M:%S.%f")
 
+        end_date = dt(end_date[0], end_date[1], end_date[2])
         end_date = end_date.strftime("%Y-%m-%d %H:%M:%S.%f")
         end_date = dt.strptime(end_date, "%Y-%m-%d %H:%M:%S.%f")
 
@@ -140,5 +142,5 @@ class PriceData:
 
 if __name__ == "__main__":
     price_data = PriceData("EURUSD")
-    fetched_data = price_data.fetch(dt(2014, 1, 1), dt(2024, 11, 18), mt5.TIMEFRAME_M15)
+    fetched_data = price_data.fetch([2014, 1, 1], [2024, 11, 18], mt5.TIMEFRAME_M15)
     price_data.save(price_array=fetched_data, path="./data/raw/price_data.csv")

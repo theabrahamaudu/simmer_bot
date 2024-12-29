@@ -107,52 +107,55 @@ class SelectFeatures():
         )
         # Train base models
         logger.info("Training base models")
-        start = perf_counter()
-        _, self.rf_rmse, rf_feature_importances, rf_feature_names = self.__RF_model()
-        self.rf_time = perf_counter() - start
+        try:
+            start = perf_counter()
+            _, self.rf_rmse, rf_feature_importances, rf_feature_names = self.__RF_model()
+            self.rf_time = perf_counter() - start
 
-        start = perf_counter()
-        _, self.xgb_rmse, xgb_feature_importances, xgb_feature_names = self.__XGB_model()
-        self.xgb_time = perf_counter() - start
+            start = perf_counter()
+            _, self.xgb_rmse, xgb_feature_importances, xgb_feature_names = self.__XGB_model()
+            self.xgb_time = perf_counter() - start
 
-        start = perf_counter
-        _, self.lgb_rmse, lgb_feature_importances, lgb_feature_names = self.__LGB_model()
-        self.lgb_time = perf_counter() - start
+            start = perf_counter()
+            _, self.lgb_rmse, lgb_feature_importances, lgb_feature_names = self.__LGB_model()
+            self.lgb_time = perf_counter() - start
 
-        # Get LSTM rmse for top k features from each model
-        logger.info("Getting LSTM rmse for top %s features", self.top_k)
+            # Get LSTM rmse for top k features from each model
+            logger.info("Getting LSTM rmse for top %s features", self.top_k)
 
-        start = perf_counter()
-        self.rf_lstm_rmse = self.__LSTM_model_rmse(rf_feature_names[:self.top_k])
-        self.rf_lstm_time = perf_counter() - start
-        logger.info("Random Forest LSTM RMSE: %.4f", self.rf_lstm_rmse)
+            start = perf_counter()
+            self.rf_lstm_rmse = self.__LSTM_model_rmse(rf_feature_names[:self.top_k])
+            self.rf_lstm_time = perf_counter() - start
+            logger.info("Random Forest LSTM RMSE: %.4f", self.rf_lstm_rmse)
 
-        start = perf_counter()
-        self.xgb_lstm_rmse = self.__LSTM_model_rmse(xgb_feature_names[:self.top_k])
-        self.xgb_lstm_time = perf_counter() - start
-        logger.info("XGBoost LSTM RMSE: %.4f", self.xgb_lstm_rmse)
+            start = perf_counter()
+            self.xgb_lstm_rmse = self.__LSTM_model_rmse(xgb_feature_names[:self.top_k])
+            self.xgb_lstm_time = perf_counter() - start
+            logger.info("XGBoost LSTM RMSE: %.4f", self.xgb_lstm_rmse)
 
-        start = perf_counter()
-        self.lgb_lstm_rmse = self.__LSTM_model_rmse(lgb_feature_names[:self.top_k])
-        self.lgb_lstm_time = perf_counter() - start
-        logger.info("LightGBM LSTM RMSE: %.4f", self.lgb_lstm_rmse)
+            start = perf_counter()
+            self.lgb_lstm_rmse = self.__LSTM_model_rmse(lgb_feature_names[:self.top_k])
+            self.lgb_lstm_time = perf_counter() - start
+            logger.info("LightGBM LSTM RMSE: %.4f", self.lgb_lstm_rmse)
 
-        logger.info("Selecting top %s features", self.top_k)
-        top_features = self.__weighted_top_features(
-            rf_feature_importances,
-            xgb_feature_importances,
-            lgb_feature_importances,
-            rf_feature_names,
-            xgb_feature_names,
-            lgb_feature_names,
-            self.rf_lstm_rmse,
-            self.xgb_lstm_rmse,
-            self.lgb_lstm_rmse
-        )
+            logger.info("Selecting top %s features", self.top_k)
+            top_features = self.__weighted_top_features(
+                rf_feature_importances,
+                xgb_feature_importances,
+                lgb_feature_importances,
+                rf_feature_names,
+                xgb_feature_names,
+                lgb_feature_names,
+                self.rf_lstm_rmse,
+                self.xgb_lstm_rmse,
+                self.lgb_lstm_rmse
+            )
 
-        self.__save_top_features(top_features)
-        self.generate_report()
-        return top_features
+            self.__save_top_features(top_features)
+            self.generate_report()
+            return top_features
+        except Exception as e:
+            logger.exception("Error running feature selection pipeline: %s", e)
 
     def __save_top_features(self, top_features: list) -> None:
         """
@@ -688,32 +691,35 @@ class TrainStackedModel(SelectFeatures):
             model.train_stack()
         """
         logger.info("Training Stacked Model")
+        try:
+            start = perf_counter()
+            self.trained_xgb_model, self.xgb_rmse = self.__XGB_model()
+            self.xgb_train_time = perf_counter() - start
 
-        start = perf_counter()
-        self.trained_xgb_model, self.xgb_rmse = self.__XGB_model()
-        self.xgb_train_time = perf_counter() - start
+            start = perf_counter()
+            self.trained_lgb_model, self.lgb_rmse = self.__LGB_model()
+            self.lgb_train_time = perf_counter() - start
 
-        start = perf_counter()
-        self.trained_lgb_model, self.lgb_rmse = self.__LGB_model()
-        self.lgb_train_time = perf_counter() - start
+            start = perf_counter()
+            self.trained_gru_model, self.gru_rmse = self.__GRU_model()
+            self.gru_train_time = perf_counter() - start
 
-        start = perf_counter()
-        self.trained_gru_model, self.gru_rmse = self.__GRU_model()
-        self.gru_train_time = perf_counter() - start
+            X_train_stacked, y_train_stacked = self.__split_data(
+                self.X_train,
+                self.y_train
+            )
 
-        X_train_stacked, y_train_stacked = self.__split_data(
-            self.X_train,
-            self.y_train
-        )
+            layer_output = self.__layer_output(X_train_stacked)
 
-        layer_output = self.__layer_output(X_train_stacked)
+            start = perf_counter()
+            self.trained_meta_model, self.meta_rmse = self.__meta_model(
+                layer_output,
+                y_train_stacked
+            )
+            self.meta_train_time = perf_counter() - start
 
-        start = perf_counter()
-        self.trained_meta_model, self.meta_rmse = self.__meta_model(
-            layer_output,
-            y_train_stacked
-        )
-        self.meta_train_time = perf_counter() - start
+        except Exception as e:
+            logger.exception("Error training stacked model: %s", e)
 
     def __layer_output(self, data: pd.DataFrame) -> pd.DataFrame:
         """

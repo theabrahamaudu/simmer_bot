@@ -1,4 +1,4 @@
-from .preprocess_pipeline import TrainPreprocessPipeline
+from src.features.preprocess_pipeline import TrainPreprocessPipeline
 
 if __name__ == "__main__":
     pipeline = TrainPreprocessPipeline(
