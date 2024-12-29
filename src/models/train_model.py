@@ -66,6 +66,41 @@ class SelectFeatures():
         self.top_features: list = None
 
     def run(self) -> list:
+        """
+        Executes the feature selection pipeline to select the top `k` features based on 
+        Random Forest, XGBoost, and LightGBM feature importances and their performance 
+        with an LSTM model.
+
+        The pipeline involves:
+            1. Training base models (Random Forest, XGBoost, LightGBM) and calculating their RMSE.
+            2. Calculating LSTM model RMSE using the top `k` features from each base model.
+            3. Aggregating feature importances and selecting the top features using a weighted approach.
+            4. Saving the selected top features and generating a report.
+
+        Returns:
+            list: A list of the top `k` selected features.
+
+        Attributes:
+            top_k (int): The number of top features to select.
+            rf_rmse (float): RMSE of the Random Forest model.
+            xgb_rmse (float): RMSE of the XGBoost model.
+            lgb_rmse (float): RMSE of the LightGBM model.
+            rf_lstm_rmse (float): RMSE of the LSTM model using top `k` features from Random Forest.
+            xgb_lstm_rmse (float): RMSE of the LSTM model using top `k` features from XGBoost.
+            lgb_lstm_rmse (float): RMSE of the LSTM model using top `k` features from LightGBM.
+            rf_time (float): Execution time for training the Random Forest model.
+            xgb_time (float): Execution time for training the XGBoost model.
+            lgb_time (float): Execution time for training the LightGBM model.
+            rf_lstm_time (float): Execution time for calculating LSTM RMSE with Random Forest features.
+            xgb_lstm_time (float): Execution time for calculating LSTM RMSE with XGBoost features.
+            lgb_lstm_time (float): Execution time for calculating LSTM RMSE with LightGBM features.
+
+        Example:
+            selected_features = feature_selector.run()
+
+        Raises:
+            Any exceptions encountered during the feature selection process will be logged and raised.
+        """
         logger.info(
             "Running feature selection pipeline to select top %s features",
             self.top_k
@@ -120,6 +155,22 @@ class SelectFeatures():
         return top_features
 
     def __save_top_features(self, top_features: list) -> None:
+        """
+        Saves the selected top features to a file.
+
+        The top features are serialized using `joblib` and stored as a `.pkl` file 
+        in the specified save path. Logs the operation's success or failure.
+
+        Args:
+            top_features (list): A list of the top features to save.
+
+        Raises:
+            Exception: If an error occurs while saving the file, it logs the error 
+                    and re-raises the exception.
+
+        Example:
+            self.__save_top_features(["feature1", "feature2", "feature3"])
+        """
         try:  
             joblib.dump(
                 top_features,
@@ -141,8 +192,36 @@ class SelectFeatures():
         rmse_rf_lstm: float,
         rmse_xgb_lstm: float,
         rmse_lgb_lstm: float
-    ) -> list:
-        
+        ) -> list:
+        """
+        Computes the weighted top features based on feature importances and model RMSE.
+
+        This method identifies the top `k` features shared across Random Forest (RF),
+        XGBoost (XGB), and LightGBM (LGB) models. It calculates a weighted average of 
+        feature importances scaled using Min-Max Scaling, adjusted by the inverse of 
+        each model's LSTM RMSE.
+
+        Args:
+            rf_feature_importances (np.ndarray): Feature importances from the RF model.
+            xgb_feature_importances (np.ndarray): Feature importances from the XGB model.
+            lgb_feature_importances (np.ndarray): Feature importances from the LGB model.
+            rf_sorted_features (Index): Features sorted by importance in the RF model.
+            xgb_sorted_features (Index): Features sorted by importance in the XGB model.
+            lgb_sorted_features (Index): Features sorted by importance in the LGB model.
+            rmse_rf_lstm (float): RMSE of the LSTM model trained on RF-selected features.
+            rmse_xgb_lstm (float): RMSE of the LSTM model trained on XGB-selected features.
+            rmse_lgb_lstm (float): RMSE of the LSTM model trained on LGB-selected features.
+
+        Returns:
+            list: A list of the top `k` features ranked by weighted average importance.
+
+        Example:
+            top_features = self.__weighted_top_features(
+                rf_importances, xgb_importances, lgb_importances,
+                rf_features, xgb_features, lgb_features,
+                rmse_rf, rmse_xgb, rmse_lgb
+            )
+        """
         # get set of top k features common to all models
         all_k = []
         for list in rf_sorted_features[:self.top_k], xgb_sorted_features[:self.top_k], lgb_sorted_features[:self.top_k]:
@@ -182,6 +261,24 @@ class SelectFeatures():
         return [feature for feature, _ in sorted_scores][:self.top_k]
 
     def __load_data(self) -> None:
+        """
+        Loads training, testing, and validation data from CSV files.
+
+        This method attempts to load the train, test, and validation data from the 
+        specified file paths. If any of the files are not found, an error message is 
+        logged. Upon successful loading, a success message is logged.
+
+        Attributes:
+            train_data (pd.DataFrame): The loaded training dataset.
+            test_data (pd.DataFrame): The loaded test dataset.
+            val_data (pd.DataFrame): The loaded validation dataset.
+
+        Raises:
+            FileNotFoundError: If any of the CSV files are not found at the specified paths.
+
+        Example:
+            self.load_data()
+        """
         try:
             self.train_data = pd.read_csv(self.train_data_path)
             self.test_data = pd.read_csv(self.test_data_path)
@@ -190,9 +287,24 @@ class SelectFeatures():
         except FileNotFoundError as e:
             logger.error("Error loading train, test, and val data: %s", e)
 
-    def __get_X_y(self, data: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
-        X = data.drop("target", axis=1)
-        y = data["target"]
+    def __get_X_y(self, data: pd.DataFrame, target: str="target") -> tuple[pd.DataFrame, pd.Series]:
+        """
+        Splits the input data into features (X) and target (y).
+
+        Args:
+            data (pd.DataFrame): The input DataFrame containing both features and target.
+            target (str, optional): The name of the target column. Defaults to "target".
+
+        Returns:
+            tuple: A tuple containing:
+                - X (pd.DataFrame): The features (all columns except the target column).
+                - y (pd.Series): The target column.
+
+        Example:
+            X, y = self.__get_X_y(data)
+        """
+        X = data.drop(target, axis=1)
+        y = data[target]
         return X, y
     
     def __RF_model(self) -> tuple[
@@ -201,6 +313,27 @@ class SelectFeatures():
         np.ndarray,
         Index
     ]:
+        """
+        Trains a Random Forest model and evaluates its performance.
+
+        This method initializes and trains a Random Forest model using the training 
+        dataset and evaluates its performance on the test set. It returns the trained model, 
+        the Root Mean Squared Error (RMSE) of the model, and the feature importances with their 
+        corresponding feature names, sorted by importance.
+
+        Args:
+            None
+
+        Returns:
+            tuple: A tuple containing:
+                - model (RandomForestRegressor): The trained Random Forest model.
+                - rmse (float): The Root Mean Squared Error (RMSE) of the model on the test data.
+                - feature_importances (np.ndarray): Array of feature importances.
+                - feature_names (Index): Sorted feature names corresponding to the feature importances.
+
+        Example:
+            model, rmse, feature_importances, feature_names = self.__RF_model()
+        """
         logger.info("Training Random Forest model")
         model = RandomForestRegressor(
             n_estimators=100,         # Number of trees in the forest
@@ -235,6 +368,27 @@ class SelectFeatures():
         np.ndarray,
         Index
     ]:
+        """
+        Trains an XGBoost model and evaluates its performance.
+
+        This method initializes and trains an XGBoost model using the training 
+        dataset and evaluates its performance on the test set. It returns the trained model, 
+        the Root Mean Squared Error (RMSE) of the model, and the feature importances with their 
+        corresponding feature names, sorted by importance.
+
+        Args:
+            None
+
+        Returns:
+            tuple: A tuple containing:
+                - model (XGBRegressor): The trained XGBoost model.
+                - rmse (float): The Root Mean Squared Error (RMSE) of the model on the test data.
+                - feature_importances (np.ndarray): Array of feature importances.
+                - feature_names (Index): Sorted feature names corresponding to the feature importances.
+
+        Example:
+            model, rmse, feature_importances, feature_names = self.__XGB_model()
+        """
         logger.info("Training XGBoost model")
         model = XGBRegressor(
             n_estimators=500,           # Number of trees
@@ -277,6 +431,26 @@ class SelectFeatures():
         np.ndarray,
         Index
     ]:
+        """
+        Trains a LightGBM model and evaluates its performance.
+
+        This method initializes and trains a LightGBM model using the training dataset and evaluates 
+        its performance on the test set. It returns the trained model, the Root Mean Squared Error (RMSE) 
+        of the model, and the feature importances with their corresponding feature names, sorted by importance.
+
+        Args:
+            None
+
+        Returns:
+            tuple: A tuple containing:
+                - model (lgb.Booster): The trained LightGBM model.
+                - rmse (float): The Root Mean Squared Error (RMSE) of the model on the test data.
+                - feature_importances (np.ndarray): Array of feature importances.
+                - feature_names (Index): Sorted feature names corresponding to the feature importances.
+
+        Example:
+            model, rmse, feature_importances, feature_names = self.__LGB_model()
+        """
         logger.info("Training LightGBM model")
         params = {
             "boosting_type": "gbdt",           # Gradient Boosting Decision Tree
@@ -323,6 +497,22 @@ class SelectFeatures():
         return model, rmse, feature_importances, feature_names
     
     def __LSTM_model_rmse(self, top_features: list) -> float:
+        """
+        Trains an LSTM model using the provided top features and calculates its RMSE.
+
+        This method trains a Bidirectional LSTM model on the given top features from the training data, 
+        evaluates its performance on the test data, and returns the Root Mean Squared Error (RMSE) of 
+        the model's predictions. The model is trained with early stopping to prevent overfitting.
+
+        Args:
+            top_features (list): A list of the top features to be used for training the LSTM model.
+
+        Returns:
+            float: The Root Mean Squared Error (RMSE) of the LSTM model on the test data.
+
+        Example:
+            rmse = self.__LSTM_model_rmse(top_features)
+        """
         timesteps = 1
         features = self.X_train[top_features].shape[2]
         lr = 0.0001
@@ -385,6 +575,32 @@ class SelectFeatures():
         return rmse
     
     def generate_report(self) -> None:
+        """
+        Generates and saves a feature selection report as a JSON file.
+
+        This method creates a detailed report containing information about the feature selection 
+        process, including RMSE scores for base models (Random Forest, XGBoost, LightGBM) and 
+        their corresponding LSTM-based feature subsets, training times, and the top selected features. 
+        The report is saved as a JSON file with a timestamped filename.
+
+        The report includes the following data:
+        - Top k features selected
+        - Initial number of features used for training
+        - RMSE values for base models and their LSTM-based feature subsets
+        - Training times for base models and LSTM models
+
+        The generated report is saved to the specified report path with a unique filename based 
+        on the `top_k` value and the current timestamp.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Example:
+            self.generate_report()
+        """
         report = {
             "top_k": self.top_k,
             "top_k_features": self.top_features,
@@ -417,12 +633,14 @@ class TrainStackedModel(SelectFeatures):
     def __init__(
             self,
             save_path: str = "./models/",
+            data_save_path: str="./data/processed/",
             top_k_features: list = None,
             top_features_path: str = "./artefacts/top_20_features_w_pipeline.pkl" 
         ) -> None:
         super().__init__(save_path=save_path)
         self.top_k_features = top_k_features
         self.top_features_path = top_features_path
+        self.data_save_path = data_save_path
         self.__weighted_top_features()
 
         self.X_train, self.y_train = self.__get_X_y(self.train_data)
@@ -445,6 +663,30 @@ class TrainStackedModel(SelectFeatures):
         self.meta_train_time: float = None
 
     def train_stack(self) -> None:
+        """
+        Trains a stacked model using multiple base models and a meta model.
+
+        This method sequentially trains several base models (XGBoost, LightGBM, and GRU) and 
+        then trains a meta model using the predictions from the base models as input. The method 
+        also computes and logs the RMSE values for each base model and the meta model. The training 
+        times for each of the base models and the meta model are also logged.
+
+        The base models trained in this method include:
+        - XGBoost
+        - LightGBM
+        - GRU (Gated Recurrent Units)
+
+        The trained meta model uses the outputs of these base models as input features for final predictions.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Example:
+            model.train_stack()
+        """
         logger.info("Training Stacked Model")
 
         start = perf_counter()
@@ -505,6 +747,37 @@ class TrainStackedModel(SelectFeatures):
             XGBRegressor,
             float
         ]:
+        """
+        Trains an XGBoost regression model and evaluates its performance.
+
+        This method initializes and trains an XGBoost model with the specified hyperparameters.
+        It also evaluates the model's performance using RMSE on the test dataset. The trained model
+        is then saved to the specified file path.
+
+        The XGBoost model is trained using the following hyperparameters:
+        - `n_estimators=60`: Number of trees (estimators) in the model.
+        - `learning_rate=0.1`: Step size for weight updates during training.
+        - `max_depth=20`: Maximum depth of each tree.
+        - `min_child_weight=10`: Minimum sum of weights in child nodes for further partitioning.
+        - `subsample=0.8`: Subsample ratio of training data.
+        - `colsample_bytree=0.8`: Subsample ratio of features for each tree.
+        - `gamma=0`: Minimum loss reduction for further partitioning.
+        - `reg_alpha=0.1`: L1 regularization parameter to prevent overfitting.
+        - `reg_lambda=1.0`: L2 regularization parameter to prevent overfitting.
+        - `random_state=42`: Seed for reproducibility.
+        - `tree_method='hist'`: Tree construction method optimized for large datasets.
+
+        Args:
+            None
+
+        Returns:
+            tuple: A tuple containing:
+                - `model` (XGBRegressor): The trained XGBoost model.
+                - `rmse` (float): The RMSE of the model on the test set.
+
+        Example:
+            model, rmse = self.__XGB_model()
+        """
         logger.info("Training XGBoost model")
         model = XGBRegressor(
             n_estimators=60,           # Number of trees
@@ -540,6 +813,42 @@ class TrainStackedModel(SelectFeatures):
         lgb.Booster,
         float
     ]:
+        """
+        Trains a LightGBM regression model and evaluates its performance.
+
+        This method initializes and trains a LightGBM model using the specified hyperparameters.
+        It evaluates the model's performance using RMSE on the test dataset and saves the trained model
+        to a specified file path.
+
+        The LightGBM model is trained with the following hyperparameters:
+        - `boosting_type="gbdt"`: Gradient Boosting Decision Tree (GBDT) method.
+        - `objective="regression"`: Regression task.
+        - `metric="rmse"`: Root Mean Squared Error (RMSE) as the evaluation metric.
+        - `num_leaves=31`: Maximum number of leaves in each tree.
+        - `learning_rate=0.05`: Lower learning rate with more boosting rounds.
+        - `feature_fraction=0.8`: Percentage of features used per tree.
+        - `bagging_fraction=0.8`: Percentage of data used per tree.
+        - `bagging_freq=5`: Perform bagging every 5 iterations.
+        - `max_depth=-1`: No maximum depth restriction.
+        - `lambda_l1=0.1`: L1 regularization to prevent overfitting.
+        - `lambda_l2=0.2`: L2 regularization to prevent overfitting.
+        - `verbosity=-1`: Suppress output.
+        - `n_jobs=-1`: Use all available CPU cores.
+        - `seed=42`: Seed for reproducibility.
+        - `early_stopping_rounds=10`: Stop training if no improvement in 10 rounds.
+        - `verbose_eval=10`: Print evaluation results every 10 rounds.
+
+        Args:
+            None
+
+        Returns:
+            tuple: A tuple containing:
+                - `model` (lgb.Booster): The trained LightGBM model.
+                - `rmse` (float): The RMSE of the model on the test set.
+
+        Example:
+            model, rmse = self.__LGB_model()
+        """
         logger.info("Training LightGBM model")
         params = {
             "boosting_type": "gbdt",           # Gradient Boosting Decision Tree
@@ -588,6 +897,31 @@ class TrainStackedModel(SelectFeatures):
         tf.keras.Model,
         float
     ]:
+        """
+        Trains a GRU (Gated Recurrent Unit) model and evaluates its performance.
+
+        This method initializes and trains a GRU model using the specified hyperparameters.
+        It evaluates the model's performance using RMSE on the test dataset and saves the trained model
+        to a specified file path.
+
+        The GRU model is trained with the following architecture and hyperparameters:
+        - 3 GRU layers with decreasing units: 256, 128, and 64.
+        - Dropout layers with a rate of 0.2 between GRU layers to prevent overfitting.
+        - A final Dense layer with a linear activation to output the prediction.
+        - Adam optimizer with a learning rate of 0.0001.
+        - Early stopping based on validation loss with a patience equal to the square root of the number of epochs.
+
+        Args:
+            None
+
+        Returns:
+            tuple: A tuple containing:
+                - `model` (tf.keras.Model): The trained GRU model.
+                - `rmse` (float): The RMSE of the model on the test set.
+
+        Example:
+            model, rmse = self.__GRU_model()
+        """
         timesteps = 1
         features = self.X_train.shape[2]
         lr = 0.0001
@@ -649,7 +983,32 @@ class TrainStackedModel(SelectFeatures):
         MLPRegressor,
         float
         ]:
+        """
+        Trains a meta model using a Multi-Layer Perceptron (MLP) Regressor and evaluates its performance.
 
+        This method trains an MLP regressor model using stacked features (predictions from base models) and the 
+        target variable. It evaluates the model's performance using RMSE on a held-out test dataset, then saves 
+        the trained model to a file.
+
+        The MLP Regressor model is trained with the following hyperparameters:
+        - Two hidden layers: 100 and 50 neurons.
+        - ReLU activation function for hidden layers.
+        - Adam solver for optimization with learning rate initialization of 0.001.
+        - Early stopping if no improvement is seen for 10 iterations.
+        - Other regularization and optimization parameters such as momentum and batch size.
+
+        Args:
+            features_stacked (pd.DataFrame): The features from stacked models (predictions from base models).
+            target_stacked (pd.Series): The true target values corresponding to the stacked features.
+
+        Returns:
+            tuple: A tuple containing:
+                - `model` (MLPRegressor): The trained meta model.
+                - `rmse` (float): The RMSE of the meta model on the test set.
+
+        Example:
+            model, rmse = self.__meta_model(features_stacked, target_stacked)
+        """
         logger.info("Training meta model")
         model = MLPRegressor(
             hidden_layer_sizes=(100, 50),
@@ -699,15 +1058,40 @@ class TrainStackedModel(SelectFeatures):
         return model, rmse
 
     def __weighted_top_features(self) -> None:
+        """
+        Loads the top-k weighted features from a specified path if not provided during initialization.
+
+        This method loads a pre-saved list of top-k features (based on their importance or weight) from a file. 
+        The file path defined by `self.top_features_path`. 
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Example:
+            self.__weighted_top_features()
+        """
         logger.info("Loading top %s features", self.top_k)
         if self.top_k_features is None:
             self.top_k_features: list = joblib.load(self.top_features_path)
 
-    def __get_X_y(self, data: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+    def __get_X_y(self, data: pd.DataFrame, target: str="target") -> tuple[pd.DataFrame, pd.Series]:
+        """
+        Splits the dataset into features (X) and target (y) using top-k features.
+
+        Args:
+            data (pd.DataFrame): Dataset containing features and the target column.
+            target (str): Name of the target column. Default is "target".
+
+        Returns:
+            tuple[pd.DataFrame, pd.Series]: Feature matrix (X) and target vector (y).
+        """
         logger.info("Splitting data into X and y for top %s features", self.top_k)
         data = data[self.top_k_features]
-        X = data.drop("target", axis=1)
-        y = data["target"]
+        X = data.drop(target, axis=1)
+        y = data[target]
         return X, y
     
     def __split_data(
@@ -716,8 +1100,20 @@ class TrainStackedModel(SelectFeatures):
             target: pd.Series,
             backtest_size: float=0.3,
             save: bool=True,
-            save_path: str="./data/processed/"
         ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
+        """
+        Splits features and target data into stacked training and backtest sets.
+
+        Args:
+            features (pd.DataFrame): Feature matrix.
+            target (pd.Series): Target vector.
+            backtest_size (float): Proportion of data for backtesting. Default is 0.3.
+            save (bool): If True, saves backtest sets to files. Default is True.
+
+        Returns:
+            tuple: Training features (X_train), training target (y_train),
+                backtest features (X_backtest), backtest target (y_backtest).
+        """
         logger.info("Splitting stacked training data into train, test, and backtest sets")
         split_idx = int(features.shape[0] * (1 - backtest_size))
         X_train = features[:split_idx]
@@ -726,13 +1122,16 @@ class TrainStackedModel(SelectFeatures):
         y_backtest = target[split_idx:]
 
         if save:
-            X_backtest.to_csv(save_path + "X_backtest.csv", index=False)
-            y_backtest.to_csv(save_path + "y_backtest.csv", index=False)
-            logger.info("Backtest data saved to %s", save_path)
+            X_backtest.to_csv(self.data_save_path + "X_backtest.csv", index=False)
+            y_backtest.to_csv(self.data_save_path + "y_backtest.csv", index=False)
+            logger.info("Backtest data saved to %s", self.data_save_path)
         return X_train, y_train
 
         
     def generate_report(self) -> None:
+        """
+        Generates and saves a training report for the stacked model.
+        """
         report = {
             "features": self.top_k_features,
             "xgb_rmse": self.xgb_rmse,

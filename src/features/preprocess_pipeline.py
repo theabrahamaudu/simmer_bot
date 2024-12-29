@@ -9,6 +9,10 @@ from src.features.preprocess_utils import (
 from src.utils.data_preprocess_log_config import logger
 
 class TrainPreprocessPipeline:
+    """
+    #! Use `"./data/interim/merged_scrapped_n_price.csv"`
+    if setting `with_llm_sentiment`=`True` in the `run` method.
+    """
     def __init__(self, data_path: str = "./data/interim/parsed_scraped_data_clipped.csv"):
         logger.info("Initializing TrainPreprocessPipeline")
         self.__source_file_path = data_path
@@ -46,7 +50,10 @@ class TrainPreprocessPipeline:
         """
         Runs the preprocessing pipeline to process raw data, apply sentiment analysis (optional), 
         add technical analysis indicators, and prepare time series data for training, testing, and validation.
-
+        
+        #! Use `"./data/interim/merged_scrapped_n_price.csv"`
+        if setting `with_llm_sentiment`=`True`
+        
         Args:
             lookback (int): The number of previous time steps to use when preparing time series data. Defaults to 6.
             target_column (str): The name of the target column in the dataset. Defaults to "target".
