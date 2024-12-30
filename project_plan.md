@@ -205,11 +205,6 @@ Here’s a **detailed project roadmap** to guide your progress in building the t
 2. **Phase 2**: Feature Engineering and Data Preparation — 2 weeks
 3. **Phase 3**: Model Training and Evaluation — 3-4 weeks
 4. **Phase 4**: Real-Time Integration and Broker API Setup — 3-4 weeks
-5. **Phase 5**: Deployment and
-
- Monitoring — 2 weeks
+5. **Phase 5**: Deployment and Monitoring — 2 weeks
 6. **Phase 6**: Continuous Improvement and Maintenance — Ongoing
 
----
-
-This roadmap should provide a solid structure for the development of your trading bot and allow you to track progress effectively. Adjust timelines as needed based on your resources and testing outcomes.
