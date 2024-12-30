@@ -1,0 +1,32 @@
+{
+    "features": [
+        "tema_14_t",
+        "high_t",
+        "wcl_price_t",
+        "med_price_t-2",
+        "med_price_t",
+        "close_t",
+        "typ_price_t",
+        "avg_price_t",
+        "tema_9_t",
+        "open_t",
+        "typ_price_t-1",
+        "wcl_price_t-2",
+        "dema_10_t-1",
+        "close_t-1",
+        "upperband_5_t",
+        "tema_14_t-1",
+        "middleband_5_t",
+        "ma_5_t",
+        "med_price_t-1",
+        "tema_9_t-1"
+    ],
+    "xgb_rmse": 0.0018145827437109831,
+    "lgb_rmse": 0.0017882951121770494,
+    "gru_rmse": 0.0020580192559067375,
+    "meta_rmse": 0.0016642465856511312,
+    "xgb_train_time": 1.0608588999602944,
+    "lgb_train_time": 0.6478502999525517,
+    "gru_train_time": 205.9331059998367,
+    "meta_train_time": 7.84861999982968
+}

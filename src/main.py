@@ -21,7 +21,7 @@ if __name__ == "__main__":
     STAGE_03 = ["Clean News Data", False]
     STAGE_04 = ["Merge News & Price Data", False]
     STAGE_05 = ["Train Preprocess Pipeline", False]
-    STAGE_06 = ["Select Features", True]
+    STAGE_06 = ["Select Features", False]
     STAGE_07 = ["Train Stacked Model", True]
     STAGE_08 = ["Run Backtest", True]
 
@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
     start_time = perf_counter()
     if STAGE_01[1]:
-        logger.info(">>>>>>>>>> starting stage: %s <<<<<<<<<<<", STAGE_01[0])
+        logger.info(">>>>>>>>>> running stage: %s <<<<<<<<<<<", STAGE_01[0])
         try:
             price_data = PriceData(str(config["symbol"]))
             fetched_data = price_data.fetch(
@@ -61,7 +61,7 @@ if __name__ == "__main__":
             price_data.save(fetched_data, "./data/raw/price_data.csv")
             logger.info(">>>>>>>>>> completed stage: %s <<<<<<<<<<<", STAGE_01[0])
         except Exception as e:
-            logger.error("Error fetching price data: %s", e)
+            logger.exception("Error fetching price data: %s", e)
     
     else:
         logger.info(">>>>>>>>>> skipped stage: %s <<<<<<<<<<<", STAGE_01[0])
@@ -71,7 +71,7 @@ if __name__ == "__main__":
 # -----------------------------------------------------------------------------
 
     if STAGE_02[1]:
-        logger.info(">>>>>>>>>> starting stage: %s <<<<<<<<<<<", STAGE_02[0])
+        logger.info(">>>>>>>>>> running stage: %s <<<<<<<<<<<", STAGE_02[0])
         try:
             news_data = NewsData(
                 symbols=[
@@ -88,7 +88,7 @@ if __name__ == "__main__":
             news_data.combine_news_csv_files()  
             logger.info(">>>>>>>>>> completed stage: %s <<<<<<<<<<<", STAGE_02[0])
         except Exception as e:
-            logger.error("Error fetching news data: %s", e)
+            logger.exception("Error fetching news data: %s", e)
     
     else:
         logger.info(">>>>>>>>>> skipped stage: %s <<<<<<<<<<<", STAGE_02[0])
@@ -98,7 +98,7 @@ if __name__ == "__main__":
 # -----------------------------------------------------------------------------
 
     if STAGE_03[1]:
-        logger.info(">>>>>>>>>> starting stage: %s <<<<<<<<<<<", STAGE_03[0])
+        logger.info(">>>>>>>>>> running stage: %s <<<<<<<<<<<", STAGE_03[0])
         try:
             news_data_cleaner = CleanData(
                 source_file_path="./data/interim/combined_scrapped_data.csv",
@@ -107,7 +107,7 @@ if __name__ == "__main__":
             news_data_cleaner.clean()
             logger.info(">>>>>>>>>> completed stage: %s <<<<<<<<<<<", STAGE_03[0])
         except Exception as e:
-            logger.error("Error cleaning news data: %s", e)
+            logger.exception("Error cleaning news data: %s", e)
     
     else:
         logger.info(">>>>>>>>>> skipped stage: %s <<<<<<<<<<<", STAGE_03[0])
@@ -117,7 +117,7 @@ if __name__ == "__main__":
 # -----------------------------------------------------------------------------
 
     if STAGE_04[1]:
-        logger.info(">>>>>>>>>> starting stage: %s <<<<<<<<<<<", STAGE_04[0])
+        logger.info(">>>>>>>>>> running stage: %s <<<<<<<<<<<", STAGE_04[0])
         try:
             merge_data = MergeData(
                 price_source_path="./data/raw/price_data.csv",
@@ -127,7 +127,7 @@ if __name__ == "__main__":
             merge_data.merge()
             logger.info(">>>>>>>>>> completed stage: %s <<<<<<<<<<<", STAGE_04[0])
         except Exception as e:
-            logger.error("Error merging data: %s", e)
+            logger.exception("Error merging data: %s", e)
     
     else:
         logger.info(">>>>>>>>>> skipped stage: %s <<<<<<<<<<<", STAGE_04[0])
@@ -137,7 +137,7 @@ if __name__ == "__main__":
 # -----------------------------------------------------------------------------
 
     if STAGE_05[1]:
-        logger.info(">>>>>>>>>> starting stage: %s <<<<<<<<<<<", STAGE_05[0])
+        logger.info(">>>>>>>>>> running stage: %s <<<<<<<<<<<", STAGE_05[0])
         try:
             train_preprocess_pipeline = TrainPreprocessPipeline(
                 data_path="./data/interim/parsed_scraped_data_clipped.csv"
@@ -145,7 +145,7 @@ if __name__ == "__main__":
             _, _, _ = train_preprocess_pipeline.run()
             logger.info(">>>>>>>>>> completed stage: %s <<<<<<<<<<<", STAGE_05[0])
         except Exception as e:
-            logger.error("Error running preprocess pipeline: %s", e)
+            logger.exception("Error running preprocess pipeline: %s", e)
 
     else:
         logger.info(">>>>>>>>>> skipped stage: %s <<<<<<<<<<<", STAGE_05[0])
@@ -155,7 +155,7 @@ if __name__ == "__main__":
 # -----------------------------------------------------------------------------
     FEATURE_LIST_EXISTS = False
     if STAGE_06[1]:
-        logger.info(">>>>>>>>>> starting stage: %s <<<<<<<<<<<", STAGE_06[0])
+        logger.info(">>>>>>>>>> running stage: %s <<<<<<<<<<<", STAGE_06[0])
         try:
             select_features = SelectFeatures()
             top_features = select_features.run()
@@ -172,20 +172,19 @@ if __name__ == "__main__":
 # -----------------------------------------------------------------------------
 
     if STAGE_07[1]:
-        logger.info(">>>>>>>>>> starting stage: %s <<<<<<<<<<<", STAGE_07[0])
+        logger.info(">>>>>>>>>> running stage: %s <<<<<<<<<<<", STAGE_07[0])
         try:
             if FEATURE_LIST_EXISTS:
                 train_stacked_model = TrainStackedModel(
                 top_k_features=top_features
                 )
+                train_stacked_model.train_stack()
             else:
                 train_stacked_model = TrainStackedModel()
                 train_stacked_model.train_stack()
-
-            train_stacked_model.train_stack()
             logger.info(">>>>>>>>>> completed stage: %s <<<<<<<<<<<", STAGE_07[0])
         except Exception as e:
-            logger.error("Error training stacked model: %s", e)
+            logger.exception("Error training stacked model: %s", e)
 
     else:
         logger.info(">>>>>>>>>> skipped stage: %s <<<<<<<<<<<", STAGE_07[0])
@@ -195,7 +194,7 @@ if __name__ == "__main__":
 # -----------------------------------------------------------------------------
 
     if STAGE_08[1]:
-        logger.info(">>>>>>>>>> starting stage: %s <<<<<<<<<<<", STAGE_08[0])
+        logger.info(">>>>>>>>>> running stage: %s <<<<<<<<<<<", STAGE_08[0])
         try:
             backtest_pipeline = RunBacktest(
                 predictions=PREDICTIONS,
@@ -204,7 +203,7 @@ if __name__ == "__main__":
             backtest_pipeline.run()
             logger.info(">>>>>>>>>> completed stage: %s <<<<<<<<<<<", STAGE_08[0])
         except Exception as e:
-            logger.error("Error running backtest: %s", e)
+            logger.exception("Error running backtest: %s", e)
 
     else:
         logger.info(">>>>>>>>>> skipped stage: %s <<<<<<<<<<<", STAGE_08[0])

@@ -139,7 +139,7 @@ class SelectFeatures():
             logger.info("LightGBM LSTM RMSE: %.4f", self.lgb_lstm_rmse)
 
             logger.info("Selecting top %s features", self.top_k)
-            top_features = self.__weighted_top_features(
+            self.top_features = self.__weighted_top_features(
                 rf_feature_importances,
                 xgb_feature_importances,
                 lgb_feature_importances,
@@ -151,9 +151,10 @@ class SelectFeatures():
                 self.lgb_lstm_rmse
             )
 
-            self.__save_top_features(top_features)
+            self.__save_top_features(self.top_features)
             self.generate_report()
-            return top_features
+            logger.info("Top %s features selected: %s", self.top_k, self.top_features)
+            return self.top_features
         except Exception as e:
             logger.exception("Error running feature selection pipeline: %s", e)
 
@@ -517,7 +518,7 @@ class SelectFeatures():
             rmse = self.__LSTM_model_rmse(top_features)
         """
         timesteps = 1
-        features = self.X_train[top_features].shape[2]
+        features = self.X_train[top_features].shape[1]
         lr = 0.0001
         epochs = 100
         batch_size = 128
@@ -548,8 +549,8 @@ class SelectFeatures():
         
         # Prepare the data
         X_train = self.X_train[top_features].values.reshape(-1, timesteps, features)
-        X_val = self.X_val.values.reshape(-1, timesteps, features)
-        X_test = self.X_test.values.reshape(-1, timesteps, features)
+        X_val = self.X_val[top_features].values.reshape(-1, timesteps, features)
+        X_test = self.X_test[top_features].values.reshape(-1, timesteps, features)
         
         # Train the model
         early_stopping = tf.keras.callbacks.EarlyStopping(
@@ -636,13 +637,16 @@ class TrainStackedModel(SelectFeatures):
     def __init__(
             self,
             save_path: str = "./models/",
+            report_path: str = "./reports/",
             data_save_path: str="./data/processed/",
             top_k_features: list = None,
             top_features_path: str = "./artefacts/top_20_features_w_pipeline.pkl" 
         ) -> None:
-        super().__init__(save_path=save_path)
+        super().__init__()
         self.top_k_features = top_k_features
         self.top_features_path = top_features_path
+        self.__save_path = save_path
+        self.__report_path = report_path
         self.data_save_path = data_save_path
         self.__weighted_top_features()
 
@@ -717,7 +721,8 @@ class TrainStackedModel(SelectFeatures):
                 y_train_stacked
             )
             self.meta_train_time = perf_counter() - start
-
+            self.generate_report()
+            logger.info("Stacked Model Training Complete")
         except Exception as e:
             logger.exception("Error training stacked model: %s", e)
 
@@ -929,7 +934,7 @@ class TrainStackedModel(SelectFeatures):
             model, rmse = self.__GRU_model()
         """
         timesteps = 1
-        features = self.X_train.shape[2]
+        features = self.X_train.shape[1]
         lr = 0.0001
         epochs = 100
         batch_size = 128
@@ -1095,8 +1100,7 @@ class TrainStackedModel(SelectFeatures):
             tuple[pd.DataFrame, pd.Series]: Feature matrix (X) and target vector (y).
         """
         logger.info("Splitting data into X and y for top %s features", self.top_k)
-        data = data[self.top_k_features]
-        X = data.drop(target, axis=1)
+        X = data[self.top_k_features]
         y = data[target]
         return X, y
     

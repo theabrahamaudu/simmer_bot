@@ -1,0 +1,17 @@
+{
+    "top_k": 20,
+    "top_k_features": null,
+    "count_init_features": 945,
+    "base_rf_rmse": 0.0016625358098021508,
+    "base_xgb_rmse": 0.0015707769535723713,
+    "base_lgb_rmse": 0.0016333476862275674,
+    "rf_features_LSTM_rmse": 0.0026648135368629727,
+    "xgb_features_LSTM_rmse": 0.00205080010305668,
+    "lgb_features_LSTM_rmse": 0.0024858686393314003,
+    "rf_train_time": 71.38563379994594,
+    "xgb_train_time": 39.77375860000029,
+    "lgb_train_time": 18.90883109997958,
+    "rf_LSTM_train_time": 500.6362829001155,
+    "xgb_LSTM_train_time": 817.8181936000474,
+    "lgb_LSTM_train_time": 850.6117493999191
+}
