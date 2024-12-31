@@ -47,7 +47,7 @@ Below is the project architecture. Each shaded area represents a separate module
 ## Run Project Locally
 
 Spin up an instannce of Simmer Bot on your local machine by following these steps:
-##### N.B: Requires Python 3.10.xx, Windows >= 10, MetaTrader5 and Ollama
+##### N.B: Requires Python 3.10.xx, Windows >= 10, MetaTrader5, Ollama and Firefox browser
 
 - Clone this repository
     ~~~
@@ -99,7 +99,7 @@ Spin up an instannce of Simmer Bot on your local machine by following these step
                 strategy=MyStrategy,
                 cash=800,           # in dollars
                 margin= 1 / 3,      # leverage ratio
-                commission=0.0004,  #broker commissions
+                commission=0.0004,  # broker commissions
             )
         ~~~
     - Navigate to `./config/config.yaml`. There, you can:
@@ -193,7 +193,7 @@ Feel free to reach out to me or create a new issue if you encounter any problems
 
 - [ ] Unit tests
 - [ ] Architecture and hyperparameter tuning for the different models used
-- [ ] Higher quality new data
+- [ ] Higher quality news data
 - [ ] Fine-tuned set of TA indicators
 - [ ] Fine-tuned trading strategy with model
 - [ ] Integration with trading platform
