@@ -1,6 +1,5 @@
-Here’s a **detailed project roadmap** to guide your progress in building the trading bot that uses both historical price data and sentiment analysis, then integrates it with broker APIs for live trading. I've broken it down into phases, with specific tasks and milestones in each phase.
-
----
+Simmer Bot Project Plan
+======================================================
 
 ### **Phase 1: Data Collection and Preprocessing**
 

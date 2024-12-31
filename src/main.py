@@ -15,7 +15,8 @@ from src.utils.main_pipeline_log_config import logger
 
 
 if __name__ == "__main__":
-    config = yaml.safe_load(open("config/config.yaml"))
+    with open("config/config.yaml", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
     STAGE_01 = ["Fetch Price Data", False]
     STAGE_02 = ["Fetch News Data", False]
     STAGE_03 = ["Clean News Data", False]
@@ -28,7 +29,7 @@ if __name__ == "__main__":
 # -----------------------------------------------------------------------------
 #   START
 # -----------------------------------------------------------------------------
-    print(f"Main pipeline started, check logs for details >> ./logs/main_pipeline.log")
+    print("Main pipeline started, check logs for details >> ./logs/main_pipeline.log")
     logger.info("Pipeline started")
     ACTIVE_STAGES = [] 
     for stage, flag in [
@@ -140,7 +141,9 @@ if __name__ == "__main__":
         logger.info(">>>>>>>>>> running stage: %s <<<<<<<<<<<", STAGE_05[0])
         try:
             train_preprocess_pipeline = TrainPreprocessPipeline(
-                data_path="./data/interim/parsed_scraped_data_clipped.csv"
+                data_path="./data/interim/parsed_scraped_data_clipped.csv",
+                with_llm_sentiment=False,
+                mock=True
             )
             _, _, _ = train_preprocess_pipeline.run()
             logger.info(">>>>>>>>>> completed stage: %s <<<<<<<<<<<", STAGE_05[0])

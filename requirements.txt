@@ -11,19 +11,19 @@ ipykernel
 ipywidgets
 
 # core packages
-MetaTrader5
+MetaTrader5==5.0.4424
 ta_lib-0.5.1-cp310-cp310-win_amd64.whl
-tqdm
-pandas
+tqdm==4.67.1
+pandas==2.2.3
 numpy==1.26.4
-matplotlib
-seaborn
-langchain-community
-selenium
-beautifulsoup4
-pyyaml
+matplotlib==3.10.0
+seaborn==0.13.2
+langchain-community==0.3.9
+selenium==4.26.1
+beautifulsoup4==4.12.3
+pyyaml==6.0.2
 scikit-learn==1.5.2
 "tensorflow<2.11"
-xgboost
-lightgbm
-Backtesting
+xgboost==2.1.3
+lightgbm==4.5.0
+Backtesting==0.3.3

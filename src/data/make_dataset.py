@@ -1,4 +1,6 @@
 import pandas as pd
+
+import yaml
 from src.utils.data_preprocess_log_config import logger
 
 
@@ -165,6 +167,9 @@ class MergeData:
     """
     Class for merging news data with price data.
     """
+    with open("config/config.yaml", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    timeframe = int(config["timeframe"])
     def __init__(
             self,
             price_source_path: str,
@@ -227,7 +232,7 @@ class MergeData:
         self.__price_df = pd.read_csv(self.price_source_path)
         self.__news_df = pd.read_csv(self.news_source_path)
     
-    def __resample_news_data(self, news_df: pd.DataFrame, interval: int = 15) -> pd.DataFrame:
+    def __resample_news_data(self, news_df: pd.DataFrame, interval: int = timeframe) -> pd.DataFrame:
         """
         Resamples news data into specified time intervals and assigns an impact priority to each news item.
 

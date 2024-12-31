@@ -1,4 +1,5 @@
 import joblib
+import yaml
 from tqdm import tqdm
 import pandas as pd
 from src.features.preprocess_pipeline import InferencePreprocessPipeline
@@ -47,11 +48,16 @@ def get_predictions(
     else:
         try:
             print("Generating predictions from raw data...")
+            with open("./config/config.yaml", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
             backtest_data = pd.read_csv(backtest_data_path)
             raw_data = pd.read_csv(raw_data_path)
             raw_data = raw_data.iloc[-(len(backtest_data)+205):,:]
             raw_data.reset_index(drop=True, inplace=True)
-            preprocessed_data = InferencePreprocessPipeline(raw_data).run()
+            preprocessed_data = InferencePreprocessPipeline(
+                raw_data,
+                mock=bool(config["mock_sentiment_backtest"])
+            ).run()
             model = PredictModel()
             predictions = []
             for index, _ in tqdm(

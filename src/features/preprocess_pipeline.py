@@ -12,11 +12,20 @@ class TrainPreprocessPipeline:
     """
     #! Use `"./data/interim/merged_scrapped_n_price.csv"`
     if setting `with_llm_sentiment`=`True` in the `run` method.
+
+    Set `mock` to `True` to use a mock sentiment analysis model (always returns neutral sentiment).
     """
-    def __init__(self, data_path: str = "./data/interim/parsed_scraped_data_clipped.csv"):
+    def __init__(
+            self,
+            data_path: str = "./data/interim/parsed_scraped_data_clipped.csv",
+            with_llm_sentiment: bool = False,
+            mock: bool = False,
+        ) -> None:
         logger.info("Initializing TrainPreprocessPipeline")
         self.__source_file_path = data_path
-        self.llm_sentiment_analysis = LLMSentimentAnalysis()
+        self.with_llm_sentiment = with_llm_sentiment
+        self.mock = mock
+        self.llm_sentiment_analysis = LLMSentimentAnalysis(mock=self.mock)
         self.ta_indicators = TAIndicators()
         self.numerical_preprocess = NumericalPreprocess()
         self.split_data = SplitData()
@@ -44,15 +53,14 @@ class TrainPreprocessPipeline:
             self,
             lookback: int = 6,
             target_column: str = "target",
-            save_path: str = "./data/processed/",
-            with_llm_sentiment: bool = False
+            save_path: str = "./data/processed/"
         ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Runs the preprocessing pipeline to process raw data, apply sentiment analysis (optional), 
         add technical analysis indicators, and prepare time series data for training, testing, and validation.
         
         #! Use `"./data/interim/merged_scrapped_n_price.csv"`
-        if setting `with_llm_sentiment`=`True`
+        if setting `with_llm_sentiment`=`True` during instance initialization.
         
         Args:
             lookback (int): The number of previous time steps to use when preparing time series data. Defaults to 6.
@@ -67,7 +75,7 @@ class TrainPreprocessPipeline:
             Any errors encountered during data loading, preprocessing, or time series preparation will be logged.
         """
         data = self.__load_data()
-        if with_llm_sentiment:
+        if self.with_llm_sentiment:
             data = self.llm_sentiment_analysis.parse_dataframe(data)
         data = self.ta_indicators.add_indicators(data)
         train, test, validate = self.split_data.raw_split(data)
@@ -155,12 +163,14 @@ class TrainPreprocessPipeline:
         return pd.DataFrame(data, columns=columns)
 
 class InferencePreprocessPipeline:
-    def __init__(self, data: pd.DataFrame):
+    def __init__(self, data: pd.DataFrame, mock: bool = True) -> None:
         self.data = data
+        self.mock = mock
         self.llm_sentiment_analysis = LLMSentimentAnalysis(
             data=self.data,
             save_path=None,
-            mock=True)
+            mock=self.mock
+        )
         self.ta_indicators = TAIndicators()
         self.numerical_preprocess = NumericalPreprocess(
             inference_mode=True
