@@ -8,7 +8,10 @@ In its current version, the project focuses on defining the architecture for dat
 
 The model is already slightly profitable on backtest data. However, to achieve optimal results, the selection of currency pairs, data sources, indicator sets, and trading strategies must be refined. This optimization process needs to draw upon seasoned foreign exchange trading experience to ensure the bot's success in dynamic market conditions.
 
-#### Performance Stats for Nerds
+### Code Walk-Through Video
+Watch the code walk-through [video](https://youtu.be/xjf5zdTEqBk) on YouTube.
+
+### Performance Stats for Nerds
 Here are the backtesting stats ($300 starting equity) for the current version (Dec 31, 2024):  
 
     Start                   2024-07-09 05:00:00
